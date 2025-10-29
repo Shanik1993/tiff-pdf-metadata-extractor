@@ -1,0 +1,101 @@
+# Python byte-compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Build and distribution files
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Windows
+Desktop.ini
+
+# Project-specific files to ignore
+# Ignore exported Excel files and input files to keep repository clean
+*.xlsx
+*.csv
+*.pdf
+*.tif
+*.tiff
+test_files/
+sample_data/
+
+# Environment variables and configuration files with secrets
+.env
+.config
+secrets.json
+credentials.json
+api_keys.py
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+.cache
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup files
+*.bak
+*.backup
+
+# MacOS
+.AppleDouble
+.LSOverride
+
+# Linux
+*~
+
+# Windows
+$RECYCLE.BIN/
+
+# Memory dumps
+*.heap
+*.core
