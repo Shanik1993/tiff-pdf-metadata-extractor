@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Activity & Online Status Monitor - Metadata Capture</title>
+  <style>
+    :root {
+      --bg: #0b1120;
+      --card-bg: rgba(17, 24, 39, 0.78);
+      --card-hover: rgba(30, 41, 59, 0.85);
+      --border: rgba(148, 163, 184, 0.12);
+      --border-light: rgba(255, 255, 255, 0.08);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.25);
+      --online: #10b981;
+      --online-bg: rgba(16, 185, 129, 0.15);
+      --online-glow: rgba(16, 185, 129, 0.35);
+      --away: #f59e0b;
+      --away-bg: rgba(245, 158, 11, 0.15);
+      --idle: #8b5cf6;
+      --idle-bg: rgba(139, 92, 246, 0.15);
+      --offline: #64748b;
+      --offline-bg: rgba(100, 116, 139, 0.15);
+      --danger: #ef4444;
+      --danger-bg: rgba(239, 68, 68, 0.15);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 0%, #1e293b 0%, var(--bg) 75%);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1300px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 24px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-title-box {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+    }
+
+    .badge-live {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: var(--online);
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--online);
+      box-shadow: 0 0 8px var(--online);
+      animation: pulse 1.6s infinite ease-in-out;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.9); opacity: 0.6; }
+      50% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 12px var(--online); }
+      100% { transform: scale(0.9); opacity: 0.6; }
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .kpi-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px 20px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .kpi-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--border-light);
+    }
+
+    .kpi-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .kpi-value {
+      font-size: 2.2rem;
+      font-weight: 800;
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .kpi-value.online { color: var(--online); text-shadow: 0 0 16px var(--online-glow); }
+    .kpi-value.away { color: var(--away); }
+    .kpi-value.accent { color: var(--accent); }
+    .kpi-value.total { color: #f8fafc; }
+    .kpi-value.danger { color: #f87171; }
+
+    .kpi-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .toolbar {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 18px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+
+    .toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      flex: 1;
+    }
+
+    .search-input {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 14px;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      min-width: 240px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-glow);
+    }
+
+    .filter-tabs {
+      display: flex;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 3px;
+      gap: 3px;
+    }
+
+    .filter-tab {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .filter-tab:hover {
+      color: var(--text);
+    }
+
+    .filter-tab.active {
+      background: #2563eb;
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+    }
+
+    .toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 7px 14px;
+      border-radius: 9px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background: rgba(51, 65, 85, 0.9);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-primary {
+      background: #2563eb;
+      border-color: transparent;
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+
+    .btn-primary:hover {
+      background: #1d4ed8;
+    }
+
+    .select-dropdown {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 7px 12px;
+      border-radius: 9px;
+      font-size: 0.82rem;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .table-container {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow-x: auto;
+      box-shadow: 0 15px 35px -10px rgba(0, 0, 0, 0.4);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.88rem;
+    }
+
+    thead th {
+      background: rgba(15, 23, 42, 0.8);
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    tbody td {
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      vertical-align: middle;
+    }
+
+    tbody tr:hover {
+      background: rgba(30, 41, 59, 0.5);
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+
+    .status-badge.online {
+      background: var(--online-bg);
+      color: var(--online);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .status-badge.away {
+      background: var(--away-bg);
+      color: var(--away);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .status-badge.idle {
+      background: var(--idle-bg);
+      color: var(--idle);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+    }
+
+    .status-badge.offline {
+      background: var(--offline-bg);
+      color: var(--offline);
+      border: 1px solid rgba(100, 116, 139, 0.3);
+    }
+
+    .user-name-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .user-name {
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .user-pc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .action-tag {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+    }
+
+    .action-tag.allocate { color: #38bdf8; border-color: rgba(56, 189, 248, 0.3); background: rgba(56, 189, 248, 0.1); }
+    .action-tag.save { color: #34d399; border-color: rgba(52, 211, 153, 0.3); background: rgba(52, 211, 153, 0.1); }
+    .action-tag.hold { color: #f87171; border-color: rgba(248, 113, 113, 0.3); background: rgba(248, 113, 113, 0.1); }
+
+    .count-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+      min-width: 32px;
+    }
+
+    .count-badge.success {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+
+    .count-badge.fail {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.25);
+    }
+
+    .ongoing-box {
+      font-size: 0.78rem;
+      color: #fca5a5;
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      border-radius: 8px;
+      padding: 6px 10px;
+      line-height: 1.35;
+    }
+
+    .empty-state {
+      padding: 40px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .refresh-bar-container {
+      width: 100%;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.05);
+      position: relative;
+      margin-top: 12px;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .refresh-bar {
+      height: 100%;
+      background: var(--accent);
+      width: 0%;
+      transition: width 0.1s linear;
+    }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+
+    <header class="header">
+      <div class="header-title-box">
+        <div class="title-row">
+          <h1 class="title">Metadata Capture</h1>
+          <span class="badge-live">
+            <span class="pulse-dot"></span>
+            LIVE RADAR
+          </span>
+        </div>
+        <p class="subtitle">Real-time operator activity, completion tracking &amp; online status</p>
+      </div>
+
+      <div class="header-actions">
+        <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border); border-radius: 10px; padding: 6px 14px; display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Queue:</span>
+          <strong id="queueCountDisplay" style="color: #38bdf8; font-size: 0.95rem;">Checking...</strong>
+        </div>
+
+        <button class="btn btn-primary" onclick="triggerManualRefresh()">
+          <span id="refreshIcon">🔄</span> Refresh Now
+        </button>
+
+        <a href="hunter.html" class="btn" style="text-decoration: none; color: #34d399; border-color: rgba(16, 185, 129, 0.3);">
+          🎯 Auto Hunter
+        </a>
+      </div>
+    </header>
+
+    <section class="kpi-grid">
+      <div class="kpi-card">
+        <span class="kpi-title">🟢 Online Operators</span>
+        <div class="kpi-value online" id="kpiOnline">0</div>
+        <span class="kpi-sub">Active in last 10 minutes</span>
+      </div>
+
+      <div class="kpi-card">
+        <span class="kpi-title">🟡 Away Operators</span>
+        <div class="kpi-value away" id="kpiAway">0</div>
+        <span class="kpi-sub">Active in last 60 minutes</span>
+      </div>
+
+      <div class="kpi-card">
+        <span class="kpi-title">👥 Total Active Today</span>
+        <div class="kpi-value total" id="kpiTotalUsers">0</div>
+        <span class="kpi-sub">Distinct logins today</span>
+      </div>
+
+      <div class="kpi-card">
+        <span class="kpi-title">✅ Today's Completions</span>
+        <div class="kpi-value accent" id="kpiCompleted">0</div>
+        <span class="kpi-sub">Total records finished</span>
+      </div>
+
+      <div class="kpi-card">
+        <span class="kpi-title">🔒 Currently Ongoing</span>
+        <div class="kpi-value danger" id="kpiOngoing">0</div>
+        <span class="kpi-sub">Allocations held by operators</span>
+      </div>
+    </section>
+
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <input 
+          type="text" 
+          id="searchInput" 
+          class="search-input" 
+          placeholder="🔍 Search user ID, PC name, or ISBN..."
+          oninput="renderTable()"
+        >
+
+        <div class="filter-tabs">
+          <button class="filter-tab active" data-filter="all" onclick="setFilter('all', this)">All Today</button>
+          <button class="filter-tab" data-filter="online" onclick="setFilter('online', this)">Online (&lt;10m)</button>
+          <button class="filter-tab" data-filter="away" onclick="setFilter('away', this)">Away (&lt;60m)</button>
+          <button class="filter-tab" data-filter="holding" onclick="setFilter('holding', this)">Holding Files (🔒)</button>
+        </div>
+      </div>
+
+      <div class="toolbar-right">
+        <label style="font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+          Refresh Every:
+          <select id="intervalSelect" class="select-dropdown" onchange="updateInterval()">
+            <option value="5000">5 seconds</option>
+            <option value="10000" selected>10 seconds (Best)</option>
+            <option value="30000">30 seconds</option>
+            <option value="60000">1 minute</option>
+            <option value="0">Manual Only</option>
+          </select>
+        </label>
+
+        <button class="btn" onclick="copySummaryText()">📋 Copy Summary</button>
+      </div>
+    </div>
+
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 130px;">Status</th>
+            <th>Operator Login ID</th>
+            <th>Last Active</th>
+            <th>Last Action</th>
+            <th>Computer / Version</th>
+            <th>Completed</th>
+            <th>Failed</th>
+            <th>Ongoing / Held File</th>
+          </tr>
+        </thead>
+        <tbody id="userTableBody">
+          <tr>
+            <td colspan="8" class="empty-state">
+              Connecting to database...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="refresh-bar-container">
+      <div class="refresh-bar" id="refreshProgressBar"></div>
+    </div>
+
+    <footer class="footer">
+      <div>
+        <span>⏱ Last Updated: </span>
+        <strong id="lastUpdatedText" style="color: #ffffff;">-</strong>
+      </div>
+      <div>
+        <span>⚡ Server Queries: </span>
+        <strong id="queryCounter" style="color: #ffffff;">0</strong>
+      </div>
+      <div>
+        <span>🔒 Secure Connection: </span>
+        <span style="color: #38bdf8;">Direct HTTPS Client</span>
+      </div>
+    </footer>
+
+  </div>
+
+  <script>
+    const API_ENDPOINT = atob("aHR0cHM6Ly91c3NpbWZsZXguaW5ub2RhdGEuY29tL0RiQ29ubmVjdG9yL2FwaS9kYi9HZXREYXRhYmFzZURhdGFTZXQ=");
+    const HEADERS = {
+      "Content-Type": "application/json",
+      "XAPIKey": atob("T0FwMVRQUEZMM0dVMjZzRWFiVkNFSmRvMWliZTZmRWl2S1FtWFYwRzhSbHBlQm5tQlFxYklaRmZpZE1oUEZXcA==")
+    };
+
+    const SQL_QUERY = `
+EXEC USP_METADATACAPTURE_GETQUEUECOUNT;
+
+WITH RecentLogs AS (
+    SELECT 
+        username,
+        hostname,
+        app_version,
+        action as last_action,
+        status as last_status,
+        isbn as last_isbn,
+        action_date,
+        DATEDIFF(minute, action_date, GETDATE()) as log_mins_ago,
+        ROW_NUMBER() OVER(PARTITION BY username ORDER BY action_date DESC) as rn
+    FROM metadata_capture_logs
+    WHERE action_date >= CAST(GETDATE() AS DATE)
+),
+UserTodayStats AS (
+    SELECT 
+        MetadataUser,
+        MAX(Updated) as last_updated,
+        DATEDIFF(minute, MAX(Updated), GETDATE()) as status_mins_ago,
+        COUNT(*) as total_records_today,
+        SUM(CASE WHEN Status = 'Metadata COMPLETED' THEN 1 ELSE 0 END) as completed_today,
+        SUM(CASE WHEN Status = 'Metadata FAILED' THEN 1 ELSE 0 END) as failed_today
+    FROM zeusz_isbnstatus
+    WHERE MetadataUser IS NOT NULL 
+      AND Updated >= CAST(GETDATE() AS DATE)
+    GROUP BY MetadataUser
+),
+OngoingHold AS (
+    SELECT 
+        MetadataUser,
+        COUNT(*) as ongoing_count,
+        MAX(ISBN) as ongoing_isbn,
+        MAX(BoxNumber) as ongoing_box,
+        MAX(HoldRemarks) as ongoing_remarks
+    FROM zeusz_isbnstatus
+    WHERE Status = 'Metadata Ongoing' AND MetadataUser IS NOT NULL
+    GROUP BY MetadataUser
+)
+SELECT 
+    COALESCE(l.username, s.MetadataUser, o.MetadataUser) as username,
+    l.hostname,
+    l.app_version,
+    l.last_action,
+    l.last_status,
+    l.last_isbn,
+    CASE 
+        WHEN l.action_date IS NOT NULL AND s.last_updated IS NOT NULL THEN
+            CASE WHEN l.action_date > s.last_updated THEN l.action_date ELSE s.last_updated END
+        ELSE COALESCE(l.action_date, s.last_updated)
+    END as last_seen_time,
+    CASE 
+        WHEN l.log_mins_ago IS NOT NULL AND s.status_mins_ago IS NOT NULL THEN
+            CASE WHEN l.log_mins_ago < s.status_mins_ago THEN l.log_mins_ago ELSE s.status_mins_ago END
+        ELSE COALESCE(l.log_mins_ago, s.status_mins_ago, 99999)
+    END as mins_ago,
+    COALESCE(s.completed_today, 0) as completed_today,
+    COALESCE(s.failed_today, 0) as failed_today,
+    COALESCE(o.ongoing_count, 0) as ongoing_count,
+    o.ongoing_isbn,
+    o.ongoing_box,
+    o.ongoing_remarks,
+    COALESCE(s.total_records_today, 0) as total_today
+FROM (SELECT * FROM RecentLogs WHERE rn = 1) l
+FULL OUTER JOIN UserTodayStats s ON l.username = s.MetadataUser
+FULL OUTER JOIN OngoingHold o ON COALESCE(l.username, s.MetadataUser) = o.MetadataUser
+ORDER BY mins_ago ASC, completed_today DESC;
+`;
+
+    let rawUserData = [];
+    let queueCount = 0;
+    let currentFilter = 'all';
+    let queryCount = 0;
+    let refreshInterval = 10000;
+    let refreshTimer = null;
+    let progressTimer = null;
+    let lastRefreshTimestamp = Date.now();
+    let isFetching = false;
+
+    window.addEventListener("DOMContentLoaded", () => {
+      fetchData();
+      startAutoRefresh();
+    });
+
+    async function fetchData() {
+      if (isFetching) return;
+      isFetching = true;
+
+      const refreshIcon = document.getElementById("refreshIcon");
+      if (refreshIcon) refreshIcon.style.animation = "spin 1s infinite linear";
+
+      const payload = {
+        applicationName: "Metadata Capture",
+        configName: "MAGAZINE",
+        configKey: atob("MmNjODVlNGItMzM4NC00N2M4LWFiOTYtMzk5YzBlYzFkYmFl"),
+        script: SQL_QUERY
+      };
+
+      try {
+        const response = await fetch(API_ENDPOINT, {
+          method: "POST",
+          headers: HEADERS,
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        queryCount++;
+        document.getElementById("queryCounter").textContent = queryCount;
+
+        if (data[0] && data[0][0]) {
+          queueCount = data[0][0].queued_count || 0;
+          document.getElementById("queueCountDisplay").textContent = `${queueCount} available`;
+          document.getElementById("queueCountDisplay").style.color = queueCount > 0 ? "#34d399" : "#38bdf8";
+        }
+
+        if (data[1]) {
+          rawUserData = data[1].filter(u => u.username && u.username.trim() !== "");
+          updateKPIs();
+          renderTable();
+        }
+
+        const now = new Date();
+        document.getElementById("lastUpdatedText").textContent = now.toLocaleTimeString();
+        lastRefreshTimestamp = Date.now();
+      } catch (err) {
+        console.error("Fetch error:", err);
+        document.getElementById("lastUpdatedText").textContent = `Error: ${err.message}`;
+      } finally {
+        isFetching = false;
+        if (refreshIcon) refreshIcon.style.animation = "";
+      }
+    }
+
+    function updateKPIs() {
+      let online = 0;
+      let away = 0;
+      let totalCompleted = 0;
+      let totalOngoing = 0;
+
+      rawUserData.forEach(u => {
+        const mins = u.mins_ago !== null ? u.mins_ago : 99999;
+        if (mins < 10) online++;
+        else if (mins < 60) away++;
+        totalCompleted += (u.completed_today || 0);
+        totalOngoing += (u.ongoing_count || 0);
+      });
+
+      document.getElementById("kpiOnline").textContent = online;
+      document.getElementById("kpiAway").textContent = away;
+      document.getElementById("kpiTotalUsers").textContent = rawUserData.length;
+      document.getElementById("kpiCompleted").textContent = totalCompleted;
+      document.getElementById("kpiOngoing").textContent = totalOngoing;
+    }
+
+    function setFilter(filter, btn) {
+      currentFilter = filter;
+      document.querySelectorAll(".filter-tab").forEach(t => t.classList.remove("active"));
+      if (btn) btn.classList.add("active");
+      renderTable();
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById("userTableBody");
+      const search = (document.getElementById("searchInput").value || "").trim().toLowerCase();
+
+      let filtered = rawUserData.filter(u => {
+        const mins = u.mins_ago !== null ? u.mins_ago : 99999;
+
+        if (currentFilter === "online" && mins >= 10) return false;
+        if (currentFilter === "away" && (mins < 10 || mins >= 60)) return false;
+        if (currentFilter === "holding" && (!u.ongoing_count || u.ongoing_count === 0)) return false;
+
+        if (search) {
+          const matchUser = (u.username || "").toLowerCase().includes(search);
+          const matchHost = (u.hostname || "").toLowerCase().includes(search);
+          const matchIsbn = (u.ongoing_isbn || "").toLowerCase().includes(search) || (u.last_isbn || "").toLowerCase().includes(search);
+          const matchAction = (u.last_action || "").toLowerCase().includes(search);
+          if (!matchUser && !matchHost && !matchIsbn && !matchAction) return false;
+        }
+
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" class="empty-state">
+              No operators matching the selected filter or search term.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      let html = "";
+      filtered.forEach(u => {
+        const mins = u.mins_ago !== null ? u.mins_ago : 99999;
+        let statusBadge = "";
+        let relativeTime = "";
+
+        if (mins < 10) {
+          statusBadge = `<span class="status-badge online"><span class="pulse-dot"></span> ONLINE</span>`;
+          relativeTime = mins === 0 ? "Just now" : `${mins}m ago`;
+        } else if (mins < 60) {
+          statusBadge = `<span class="status-badge away">🟡 AWAY</span>`;
+          relativeTime = `${mins}m ago`;
+        } else if (mins < 240) {
+          statusBadge = `<span class="status-badge idle">🟣 IDLE</span>`;
+          const hrs = Math.floor(mins / 60);
+          relativeTime = `${hrs}h ${mins % 60}m ago`;
+        } else {
+          statusBadge = `<span class="status-badge offline">⚪ OFFLINE</span>`;
+          if (mins < 1440) {
+            const hrs = Math.floor(mins / 60);
+            relativeTime = `${hrs}h ago`;
+          } else {
+            relativeTime = `Earlier`;
+          }
+        }
+
+        let actionTag = "";
+        if (u.last_action) {
+          let actClass = "allocate";
+          let label = u.last_action;
+          if (u.last_action === "ALLOCATE") { label = "Queue Request"; actClass = "allocate"; }
+          else if (u.last_action === "SAVE") { label = "Saved Item"; actClass = "save"; }
+          else if (u.last_action === "HOLD") { label = "Hold Item"; actClass = "hold"; }
+          actionTag = `<span class="action-tag ${actClass}">${label}</span>`;
+        } else {
+          actionTag = `<span style="color: var(--text-muted); font-size: 0.78rem;">-</span>`;
+        }
+
+        const pcName = u.hostname || "Unknown PC";
+        const appVer = u.app_version ? `v${u.app_version}` : "";
+
+        let ongoingDisplay = `<span style="color: var(--text-muted); font-size: 0.8rem;">None</span>`;
+        if (u.ongoing_count > 0) {
+          const isbn = u.ongoing_isbn || "File Ongoing";
+          const box = u.ongoing_box ? ` | ${u.ongoing_box}` : "";
+          const remarks = u.ongoing_remarks ? `<br><em>${escapeHtml(u.ongoing_remarks)}</em>` : "";
+          ongoingDisplay = `
+            <div class="ongoing-box">
+              🔒 <strong>${escapeHtml(isbn)}</strong>${escapeHtml(box)}
+              ${remarks}
+            </div>
+          `;
+        }
+
+        html += `
+          <tr>
+            <td>${statusBadge}</td>
+            <td>
+              <div class="user-name-cell">
+                <span class="user-name">${escapeHtml(u.username)}</span>
+              </div>
+            </td>
+            <td><strong style="color: #ffffff;">${relativeTime}</strong></td>
+            <td>${actionTag}</td>
+            <td>
+              <div class="user-name-cell">
+                <span class="user-pc">${escapeHtml(pcName)}</span>
+                <span style="font-size: 0.72rem; color: var(--text-muted);">${escapeHtml(appVer)}</span>
+              </div>
+            </td>
+            <td><span class="count-badge success">${u.completed_today || 0}</span></td>
+            <td><span class="count-badge fail">${u.failed_today || 0}</span></td>
+            <td>${ongoingDisplay}</td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = html;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function triggerManualRefresh() {
+      fetchData();
+    }
+
+    function updateInterval() {
+      const select = document.getElementById("intervalSelect");
+      refreshInterval = parseInt(select.value, 10);
+      startAutoRefresh();
+    }
+
+    function startAutoRefresh() {
+      if (refreshTimer) clearInterval(refreshTimer);
+      if (progressTimer) clearInterval(progressTimer);
+
+      if (refreshInterval > 0) {
+        lastRefreshTimestamp = Date.now();
+        refreshTimer = setInterval(() => {
+          fetchData();
+        }, refreshInterval);
+
+        progressTimer = setInterval(() => {
+          const elapsed = Date.now() - lastRefreshTimestamp;
+          const pct = Math.min(100, (elapsed / refreshInterval) * 100);
+          const bar = document.getElementById("refreshProgressBar");
+          if (bar) bar.style.width = `${pct}%`;
+        }, 100);
+      } else {
+        const bar = document.getElementById("refreshProgressBar");
+        if (bar) bar.style.width = `0%`;
+      }
+    }
+
+    function copySummaryText() {
+      let onlineUsers = rawUserData.filter(u => (u.mins_ago !== null ? u.mins_ago : 99999) < 10);
+      let awayUsers = rawUserData.filter(u => {
+        const m = u.mins_ago !== null ? u.mins_ago : 99999;
+        return m >= 10 && m < 60;
+      });
+
+      let summary = `METADATA CAPTURE - OPERATOR ACTIVITY REPORT\n`;
+      summary += `Timestamp: ${new Date().toLocaleString()}\n`;
+      summary += `Queue Available: ${queueCount}\n`;
+      summary += `--------------------------------------------------\n`;
+      summary += `ONLINE NOW (${onlineUsers.length}):\n`;
+      onlineUsers.forEach(u => {
+        summary += `  - ${u.username} (${u.mins_ago}m ago) | Completed: ${u.completed_today || 0} | PC: ${u.hostname || '-'}\n`;
+      });
+      summary += `\nRECENTLY AWAY (${awayUsers.length}):\n`;
+      awayUsers.forEach(u => {
+        summary += `  - ${u.username} (${u.mins_ago}m ago) | Completed: ${u.completed_today || 0}\n`;
+      });
+      summary += `--------------------------------------------------\n`;
+      summary += `Total Operators Active Today: ${rawUserData.length}\n`;
+
+      navigator.clipboard.writeText(summary).then(() => {
+        alert("Summary copied to clipboard!");
+      }).catch(err => {
+        console.error("Clipboard copy failed:", err);
+      });
+    }
+  </script>
+</body>
+</html>

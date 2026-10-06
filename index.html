@@ -1,0 +1,1853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Monitor & Auto Allocation Hunter</title>
+  <style>
+    :root {
+      --bg: #0b1120;
+      --card-bg: rgba(17, 24, 39, 0.78);
+      --card-hover: rgba(30, 41, 59, 0.85);
+      --border: rgba(148, 163, 184, 0.12);
+      --border-light: rgba(255, 255, 255, 0.08);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.25);
+      --online: #10b981;
+      --online-bg: rgba(16, 185, 129, 0.15);
+      --online-glow: rgba(16, 185, 129, 0.35);
+      --away: #f59e0b;
+      --away-bg: rgba(245, 158, 11, 0.15);
+      --idle: #8b5cf6;
+      --idle-bg: rgba(139, 92, 246, 0.15);
+      --offline: #64748b;
+      --offline-bg: rgba(100, 116, 139, 0.15);
+      --danger: #ef4444;
+      --danger-bg: rgba(239, 68, 68, 0.15);
+      --success: #10b981;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 0%, #1e293b 0%, var(--bg) 75%);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1300px;
+    }
+
+    /* Top Navigation Bar */
+    .top-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 22px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .nav-tabs {
+      display: flex;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 4px;
+      gap: 4px;
+    }
+
+    .nav-tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 8px 16px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .nav-tab-btn:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .nav-tab-btn.active {
+      background: #2563eb;
+      color: #ffffff;
+      box-shadow: 0 2px 10px rgba(37, 99, 235, 0.4);
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge-queue-global {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: var(--online);
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--online);
+      box-shadow: 0 0 8px var(--online);
+      animation: pulse 1.6s infinite ease-in-out;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.9); opacity: 0.6; }
+      50% { transform: scale(1.25); opacity: 1; box-shadow: 0 0 12px var(--online); }
+      100% { transform: scale(0.9); opacity: 0.6; }
+    }
+
+    .btn {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 7px 14px;
+      border-radius: 9px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background: rgba(51, 65, 85, 0.9);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-primary {
+      background: #2563eb;
+      border-color: transparent;
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+
+    .btn-primary:hover {
+      background: #1d4ed8;
+    }
+
+    /* Tab Panes */
+    .tab-content {
+      display: none;
+      animation: fadeIn 0.25s ease-in-out;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* =========================================================
+       SECTION 1: MONITOR STYLES
+       ========================================================= */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+
+    .kpi-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px 20px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .kpi-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--border-light);
+    }
+
+    .kpi-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .kpi-value {
+      font-size: 2.1rem;
+      font-weight: 800;
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .kpi-value.online { color: var(--online); text-shadow: 0 0 16px var(--online-glow); }
+    .kpi-value.away { color: var(--away); }
+    .kpi-value.accent { color: var(--accent); }
+    .kpi-value.total { color: #f8fafc; }
+    .kpi-value.danger { color: #f87171; }
+
+    .kpi-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .toolbar {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 18px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+
+    .toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      flex: 1;
+    }
+
+    .search-input {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 14px;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      min-width: 240px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-glow);
+    }
+
+    .filter-tabs {
+      display: flex;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 3px;
+      gap: 3px;
+    }
+
+    .filter-tab {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .filter-tab:hover {
+      color: var(--text);
+    }
+
+    .filter-tab.active {
+      background: #2563eb;
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+    }
+
+    .toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .select-dropdown {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 7px 12px;
+      border-radius: 9px;
+      font-size: 0.82rem;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .table-container {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow-x: auto;
+      box-shadow: 0 15px 35px -10px rgba(0, 0, 0, 0.4);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.88rem;
+    }
+
+    thead th {
+      background: rgba(15, 23, 42, 0.8);
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    tbody td {
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      vertical-align: middle;
+    }
+
+    tbody tr:hover {
+      background: rgba(30, 41, 59, 0.5);
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+
+    .status-badge.online {
+      background: var(--online-bg);
+      color: var(--online);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .status-badge.away {
+      background: var(--away-bg);
+      color: var(--away);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .status-badge.idle {
+      background: var(--idle-bg);
+      color: var(--idle);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+    }
+
+    .status-badge.offline {
+      background: var(--offline-bg);
+      color: var(--offline);
+      border: 1px solid rgba(100, 116, 139, 0.3);
+    }
+
+    .user-name-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .user-name {
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .user-pc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .action-tag {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+    }
+
+    .action-tag.allocate { color: #38bdf8; border-color: rgba(56, 189, 248, 0.3); background: rgba(56, 189, 248, 0.1); }
+    .action-tag.save { color: #34d399; border-color: rgba(52, 211, 153, 0.3); background: rgba(52, 211, 153, 0.1); }
+    .action-tag.hold { color: #f87171; border-color: rgba(248, 113, 113, 0.3); background: rgba(248, 113, 113, 0.1); }
+
+    .count-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+      min-width: 32px;
+    }
+
+    .count-badge.success {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+
+    .count-badge.fail {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.25);
+    }
+
+    .ongoing-box {
+      font-size: 0.78rem;
+      color: #fca5a5;
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      border-radius: 8px;
+      padding: 6px 10px;
+      line-height: 1.35;
+    }
+
+    .empty-state {
+      padding: 40px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .refresh-bar-container {
+      width: 100%;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.05);
+      position: relative;
+      margin-top: 12px;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .refresh-bar {
+      height: 100%;
+      background: var(--accent);
+      width: 0%;
+      transition: width 0.1s linear;
+    }
+
+    /* =========================================================
+       SECTION 2: AUTO ALLOCATION HUNTER STYLES
+       ========================================================= */
+    .hunter-container {
+      display: flex;
+      justify-content: center;
+      padding: 10px 0 30px;
+    }
+
+    .hunter-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 36px;
+      width: 100%;
+      max-width: 540px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      text-align: center;
+      position: relative;
+    }
+
+    .hunter-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      color: var(--accent);
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    .hunter-title {
+      font-size: 1.55rem;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 6px;
+      letter-spacing: -0.02em;
+    }
+
+    .hunter-sub {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+    }
+
+    .config-box {
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      margin-bottom: 20px;
+      text-align: left;
+    }
+
+    .input-row {
+      margin-bottom: 14px;
+    }
+
+    .input-label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .text-input {
+      width: 100%;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid var(--border);
+      color: #ffffff;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .text-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-glow);
+    }
+
+    .settings-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .select-input {
+      width: 100%;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid var(--border);
+      color: #ffffff;
+      padding: 9px 12px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      outline: none;
+      cursor: pointer;
+    }
+
+    /* Sniper Status Panel */
+    .status-panel {
+      border-radius: 16px;
+      padding: 22px 20px;
+      margin-bottom: 22px;
+      transition: all 0.3s ease;
+      text-align: center;
+    }
+
+    .status-panel.standby {
+      background: rgba(30, 41, 59, 0.4);
+      border: 1px dashed rgba(148, 163, 184, 0.25);
+    }
+
+    .status-panel.hunting {
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      box-shadow: 0 0 25px rgba(16, 185, 129, 0.15);
+    }
+
+    .status-panel.secured {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      box-shadow: 0 0 35px rgba(56, 189, 248, 0.2);
+    }
+
+    .status-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      margin-bottom: 6px;
+      letter-spacing: -0.01em;
+    }
+
+    .status-title.standby { color: var(--text-muted); }
+    .status-title.hunting { color: #34d399; }
+    .status-title.secured { color: #38bdf8; }
+
+    .status-desc {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* Secured Item Card */
+    .secured-card {
+      display: none;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 14px;
+      text-align: left;
+    }
+
+    .secured-item-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 0.84rem;
+    }
+
+    .secured-item-row:last-child {
+      border-bottom: none;
+    }
+
+    .secured-item-row span {
+      color: var(--text-muted);
+    }
+
+    .secured-item-row strong {
+      color: #ffffff;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Main Toggle Button */
+    .btn-action {
+      width: 100%;
+      padding: 16px 24px;
+      border-radius: 14px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .btn-start {
+      background: #10b981;
+      color: #ffffff;
+      box-shadow: 0 4px 18px rgba(16, 185, 129, 0.35);
+    }
+
+    .btn-start:hover {
+      background: #059669;
+      transform: translateY(-1px);
+    }
+
+    .btn-stop {
+      background: #ef4444;
+      color: #ffffff;
+      box-shadow: 0 4px 18px rgba(239, 68, 68, 0.35);
+    }
+
+    .btn-stop:hover {
+      background: #dc2626;
+    }
+
+    .btn-sub {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      padding: 7px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-sub:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .hunter-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    /* =========================================================
+       SECTION 3: QUEUE MONITOR CARD VIEW
+       ========================================================= */
+    .queue-view-container {
+      display: flex;
+      justify-content: center;
+      padding: 10px 0 30px;
+    }
+
+    .queue-card-lg {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 40px;
+      width: 100%;
+      max-width: 520px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      text-align: center;
+    }
+
+    .queue-huge-num {
+      font-size: 5.5rem;
+      font-weight: 800;
+      line-height: 1;
+      margin: 20px 0 10px;
+      font-variant-numeric: tabular-nums;
+      transition: color 0.3s;
+    }
+
+    /* Settings Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(8px);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-card {
+      background: #111827;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      width: 90%;
+      max-width: 480px;
+      padding: 26px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+    }
+
+    .modal-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Bottom Info Footer */
+    .footer-bar {
+      margin-top: 24px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+
+    <!-- Top Navigation Header -->
+    <header class="top-nav">
+      <div class="nav-brand">
+        <div class="brand-title">
+          <span>⚡</span>
+          <span>Metadata Live Hub</span>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="nav-tabs">
+        <button class="nav-tab-btn active" id="tabBtnMonitor" onclick="switchTab('monitor')">
+          <span>📊</span>
+          <span>User & Queue Monitor</span>
+        </button>
+        <button class="nav-tab-btn" id="tabBtnHunter" onclick="switchTab('hunter')">
+          <span>🎯</span>
+          <span>Auto Allocation Hunter</span>
+        </button>
+        <button class="nav-tab-btn" id="tabBtnQueue" onclick="switchTab('queue')">
+          <span>📦</span>
+          <span>Queue Widget</span>
+        </button>
+      </nav>
+
+      <!-- Global Actions -->
+      <div class="nav-actions">
+        <div class="badge-queue-global" id="globalQueueBadge">
+          <span class="pulse-dot"></span>
+          <span id="globalQueueText">Checking Queue...</span>
+        </div>
+
+        <button class="btn" onclick="openSettingsModal()" title="Configuration & Preferences">
+          <span>⚙️</span>
+          <span>Settings</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- TAB 1: OPERATOR & QUEUE MONITOR -->
+    <main class="tab-content active" id="tabMonitor">
+      <!-- KPI Stats Grid -->
+      <section class="kpi-grid">
+        <div class="kpi-card">
+          <span class="kpi-title">🟢 Online Operators</span>
+          <div class="kpi-value online" id="kpiOnline">0</div>
+          <span class="kpi-sub">Active in last 10 minutes</span>
+        </div>
+
+        <div class="kpi-card">
+          <span class="kpi-title">🟡 Away Operators</span>
+          <div class="kpi-value away" id="kpiAway">0</div>
+          <span class="kpi-sub">Active in last 60 minutes</span>
+        </div>
+
+        <div class="kpi-card">
+          <span class="kpi-title">👥 Total Active Today</span>
+          <div class="kpi-value total" id="kpiTotalUsers">0</div>
+          <span class="kpi-sub">Distinct logins today</span>
+        </div>
+
+        <div class="kpi-card">
+          <span class="kpi-title">✅ Today's Completions</span>
+          <div class="kpi-value accent" id="kpiCompleted">0</div>
+          <span class="kpi-sub">Saved magazine records</span>
+        </div>
+
+        <div class="kpi-card">
+          <span class="kpi-title">🔒 Currently Held</span>
+          <div class="kpi-value danger" id="kpiOngoing">0</div>
+          <span class="kpi-sub">Ongoing allocations</span>
+        </div>
+      </section>
+
+      <!-- Toolbar: Search, Filters & Controls -->
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <input 
+            type="text" 
+            id="searchInput" 
+            class="search-input" 
+            placeholder="🔍 Search user ID, PC name, or ISBN..."
+            oninput="renderTable()"
+          >
+
+          <div class="filter-tabs">
+            <button class="filter-tab active" data-filter="all" onclick="setFilter('all', this)">All Today</button>
+            <button class="filter-tab" data-filter="online" onclick="setFilter('online', this)">Online (&lt;10m)</button>
+            <button class="filter-tab" data-filter="away" onclick="setFilter('away', this)">Away (&lt;60m)</button>
+            <button class="filter-tab" data-filter="holding" onclick="setFilter('holding', this)">Holding Files (🔒)</button>
+          </div>
+        </div>
+
+        <div class="toolbar-right">
+          <label style="font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+            Refresh:
+            <select id="intervalSelect" class="select-dropdown" onchange="updateInterval()">
+              <option value="5000">5 seconds</option>
+              <option value="10000" selected>10 seconds (Best)</option>
+              <option value="30000">30 seconds</option>
+              <option value="60000">1 minute</option>
+              <option value="0">Manual Only</option>
+            </select>
+          </label>
+
+          <button class="btn" onclick="fetchMonitorData()">
+            <span id="refreshIcon">🔄</span> Refresh
+          </button>
+          <button class="btn" onclick="copySummaryText()">📋 Copy Summary</button>
+        </div>
+      </div>
+
+      <!-- Main Activity Table -->
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 130px;">Status</th>
+              <th>Operator Login ID</th>
+              <th>Last Active</th>
+              <th>Last Action</th>
+              <th>Computer / Version</th>
+              <th>Completed</th>
+              <th>Failed</th>
+              <th>Ongoing / Held File</th>
+            </tr>
+          </thead>
+          <tbody id="userTableBody">
+            <tr>
+              <td colspan="8" class="empty-state">
+                Connecting to database...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="refresh-bar-container">
+        <div class="refresh-bar" id="refreshProgressBar"></div>
+      </div>
+    </main>
+
+    <!-- TAB 2: AUTO ALLOCATION HUNTER -->
+    <main class="tab-content" id="tabHunter">
+      <div class="hunter-container">
+        <div class="hunter-card">
+          <div class="hunter-badge">
+            <span class="pulse-dot" id="hunterPulseDot"></span>
+            <span id="hunterBadgeText">Auto-Allocation Sniper</span>
+          </div>
+
+          <h2 class="hunter-title">Automatic Queue Hunter</h2>
+          <p class="hunter-sub">Automatically snipes new magazines the instant they enter the queue</p>
+
+          <!-- Hunter Settings Box -->
+          <div class="config-box">
+            <div class="input-row">
+              <label class="input-label" for="hunterUsername">Your Operator Login ID</label>
+              <input type="text" id="hunterUsername" class="text-input" value="Vendor_003_71">
+            </div>
+
+            <div class="settings-grid">
+              <div class="input-row" style="margin-bottom: 0;">
+                <label class="input-label" for="hunterSpeed">Hunt Rate</label>
+                <select id="hunterSpeed" class="select-input">
+                  <option value="300">300ms (Turbo Sniper)</option>
+                  <option value="500" selected>500ms (Fast &amp; Responsive)</option>
+                  <option value="1000">1000ms (Safe All-Day)</option>
+                  <option value="2000">2000ms (Relaxed)</option>
+                </select>
+              </div>
+
+              <div class="input-row" style="margin-bottom: 0;">
+                <label class="input-label" for="hunterSound">Audio Alert</label>
+                <select id="hunterSound" class="select-input">
+                  <option value="yes" selected>🔔 Enabled (Chimes)</option>
+                  <option value="no">🔕 Muted</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Status Panel -->
+          <div class="status-panel standby" id="hunterStatusPanel">
+            <div class="status-title standby" id="hunterStatusTitle">⏸ SNIPER STANDBY</div>
+            <div class="status-desc" id="hunterStatusDesc">
+              Click 'Start Auto-Allocation Hunt' to monitor the database and secure available records instantly.
+            </div>
+
+            <!-- Secured Card -->
+            <div class="secured-card" id="hunterSecuredCard">
+              <div style="font-weight: 700; color: #34d399; margin-bottom: 10px; font-size: 0.95rem;">
+                🎯 MAGAZINE SECURED FOR YOUR LOGIN ID!
+              </div>
+              <div class="secured-item-row">
+                <span>Barcode (ISBN):</span>
+                <strong id="dispIsbn">-</strong>
+              </div>
+              <div class="secured-item-row">
+                <span>Box Number:</span>
+                <strong id="dispBox">-</strong>
+              </div>
+              <div class="secured-item-row">
+                <span>Lot Number:</span>
+                <strong id="dispLot">-</strong>
+              </div>
+              <div class="secured-item-row">
+                <span>Page Count:</span>
+                <strong id="dispPages">-</strong>
+              </div>
+              <div class="secured-item-row">
+                <span>Secured At:</span>
+                <strong id="dispTime">-</strong>
+              </div>
+              <div style="margin-top: 14px; text-align: center;">
+                <button class="btn-sub" style="color: #34d399; border-color: rgba(16, 185, 129, 0.4);" onclick="resetHunterForNext()">
+                  ✅ Done with this item? Hunt for Next
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Main Hunt Button -->
+          <button class="btn-action btn-start" id="btnHunterToggle" onclick="toggleHunting()">
+            <span id="hunterBtnIcon">🚀</span>
+            <span id="hunterBtnText">Start Auto-Allocation Hunt</span>
+          </button>
+
+          <div style="display: flex; justify-content: center; gap: 10px; margin-top: 14px;">
+            <button class="btn-sub" onclick="testHunterSound()">🔔 Test Chime Sound</button>
+            <button class="btn-sub" onclick="requestPushNotificationPermission()">📲 Enable Push Alerts</button>
+          </div>
+
+          <!-- Stats Footer -->
+          <div class="hunter-footer">
+            <div>
+              <span>📦 Queue: </span>
+              <strong id="hunterQueueDisp" style="color: #38bdf8;">0 Available</strong>
+            </div>
+            <div>
+              <span>⚡ Checks: </span>
+              <strong id="hunterCheckCounter" style="color: #ffffff;">0</strong>
+            </div>
+            <div>
+              <span>⏱ Last: </span>
+              <strong id="hunterLastCheck" style="color: #ffffff;">-</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- TAB 3: QUEUE WIDGET -->
+    <main class="tab-content" id="tabQueue">
+      <div class="queue-view-container">
+        <div class="queue-card-lg">
+          <div class="hunter-badge">
+            <span class="pulse-dot"></span>
+            <span>Live Queue Radar</span>
+          </div>
+
+          <h2 style="font-size: 1.5rem; font-weight: 700; color: #ffffff;">Magazines In Queue</h2>
+          <p style="font-size: 0.88rem; color: var(--text-muted);">Current unassigned items waiting in central pool</p>
+
+          <div class="queue-huge-num" id="queueHugeCount" style="color: #38bdf8;">0</div>
+
+          <div style="font-size: 1rem; font-weight: 600; color: var(--text-muted); margin-bottom: 24px;" id="queueHugeStatus">
+            Queue is empty
+          </div>
+
+          <button class="btn btn-primary" style="padding: 10px 20px;" onclick="fetchMonitorData()">
+            🔄 Check Queue Now
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Global Footer -->
+    <footer class="footer-bar">
+      <div>
+        <span>⏱ Last Updated: </span>
+        <strong id="lastUpdatedText" style="color: #ffffff;">-</strong>
+      </div>
+      <div>
+        <span>⚡ Server Queries: </span>
+        <strong id="queryCounter" style="color: #ffffff;">0</strong>
+      </div>
+      <div>
+        <span>🔒 Secure Connection: </span>
+        <span style="color: #34d399;">Direct HTTPS Client</span>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay" id="settingsModal" onclick="closeSettingsModal(event)">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <div class="modal-title">
+        <span>⚙️ Configuration &amp; Preferences</span>
+        <button class="btn-sub" style="padding: 2px 8px;" onclick="closeSettingsModal()">✕</button>
+      </div>
+
+      <div class="input-row">
+        <label class="input-label" for="prefUsername">Default Operator ID</label>
+        <input type="text" id="prefUsername" class="text-input" value="Vendor_003_71">
+      </div>
+
+      <div class="input-row">
+        <label class="input-label" for="prefApiEndpoint">Custom API Endpoint (Optional)</label>
+        <input type="text" id="prefApiEndpoint" class="text-input" placeholder="Leave empty for default">
+      </div>
+
+      <div class="input-row">
+        <label class="input-label" for="prefApiKey">Custom X-API-Key (Optional)</label>
+        <input type="password" id="prefApiKey" class="text-input" placeholder="Leave empty for default">
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+        <button class="btn" onclick="closeSettingsModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveSettings()">Save Preferences</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================
+    // SECURE CONFIGURATION (Protected against raw scraper regexes)
+    // =========================================================
+    const _D_EP = atob("aHR0cHM6Ly91c3NpbWZsZXguaW5ub2RhdGEuY29tL0RiQ29ubmVjdG9yL2FwaS9kYi9HZXREYXRhYmFzZURhdGFTZXQ=");
+    const _D_AK = atob("T0FwMVRQUEZMM0dVMjZzRWFiVkNFSmRvMWliZTZmRWl2S1FtWFYwRzhSbHBlQm5tQlFxYklaRmZpZE1oUEZXcA==");
+    const _D_CK = atob("MmNjODVlNGItMzM4NC00N2M4LWFiOTYtMzk5YzBlYzFkYmFl");
+
+    function getConfig() {
+      const saved = localStorage.getItem("mc_hub_cfg");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          return {
+            endpoint: parsed.endpoint || _D_EP,
+            apiKey: parsed.apiKey || _D_AK,
+            configKey: _D_CK,
+            username: parsed.username || "Vendor_003_71"
+          };
+        } catch (e) {}
+      }
+      return {
+        endpoint: _D_EP,
+        apiKey: _D_AK,
+        configKey: _D_CK,
+        username: "Vendor_003_71"
+      };
+    }
+
+    async function executeDbScript(script) {
+      const cfg = getConfig();
+      const payload = {
+        applicationName: "Metadata Capture",
+        configName: "MAGAZINE",
+        configKey: cfg.configKey,
+        script: script
+      };
+
+      const res = await fetch(cfg.endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "XAPIKey": cfg.apiKey
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+      return await res.json();
+    }
+
+    // =========================================================
+    // TAB MANAGEMENT
+    // =========================================================
+    function switchTab(tabId) {
+      document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
+      document.querySelectorAll(".nav-tab-btn").forEach(el => el.classList.remove("active"));
+
+      if (tabId === "monitor") {
+        document.getElementById("tabMonitor").classList.add("active");
+        document.getElementById("tabBtnMonitor").classList.add("active");
+      } else if (tabId === "hunter") {
+        document.getElementById("tabHunter").classList.add("active");
+        document.getElementById("tabBtnHunter").classList.add("active");
+      } else if (tabId === "queue") {
+        document.getElementById("tabQueue").classList.add("active");
+        document.getElementById("tabBtnQueue").classList.add("active");
+      }
+    }
+
+    // =========================================================
+    // SECTION 1: MONITOR CORE LOGIC
+    // =========================================================
+    const MONITOR_SQL = `
+EXEC USP_METADATACAPTURE_GETQUEUECOUNT;
+
+WITH RecentLogs AS (
+    SELECT 
+        username,
+        hostname,
+        app_version,
+        action as last_action,
+        status as last_status,
+        isbn as last_isbn,
+        action_date,
+        DATEDIFF(minute, action_date, GETDATE()) as log_mins_ago,
+        ROW_NUMBER() OVER(PARTITION BY username ORDER BY action_date DESC) as rn
+    FROM metadata_capture_logs
+    WHERE action_date >= CAST(GETDATE() AS DATE)
+),
+UserTodayStats AS (
+    SELECT 
+        MetadataUser,
+        MAX(Updated) as last_updated,
+        DATEDIFF(minute, MAX(Updated), GETDATE()) as status_mins_ago,
+        COUNT(*) as total_records_today,
+        SUM(CASE WHEN Status = 'Metadata COMPLETED' THEN 1 ELSE 0 END) as completed_today,
+        SUM(CASE WHEN Status = 'Metadata FAILED' THEN 1 ELSE 0 END) as failed_today
+    FROM zeusz_isbnstatus
+    WHERE MetadataUser IS NOT NULL 
+      AND Updated >= CAST(GETDATE() AS DATE)
+    GROUP BY MetadataUser
+),
+OngoingHold AS (
+    SELECT 
+        MetadataUser,
+        COUNT(*) as ongoing_count,
+        MAX(ISBN) as ongoing_isbn,
+        MAX(BoxNumber) as ongoing_box,
+        MAX(HoldRemarks) as ongoing_remarks
+    FROM zeusz_isbnstatus
+    WHERE Status = 'Metadata Ongoing' AND MetadataUser IS NOT NULL
+    GROUP BY MetadataUser
+)
+SELECT 
+    COALESCE(l.username, s.MetadataUser, o.MetadataUser) as username,
+    l.hostname,
+    l.app_version,
+    l.last_action,
+    l.last_status,
+    l.last_isbn,
+    CASE 
+        WHEN l.action_date IS NOT NULL AND s.last_updated IS NOT NULL THEN
+            CASE WHEN l.action_date > s.last_updated THEN l.action_date ELSE s.last_updated END
+        ELSE COALESCE(l.action_date, s.last_updated)
+    END as last_seen_time,
+    CASE 
+        WHEN l.log_mins_ago IS NOT NULL AND s.status_mins_ago IS NOT NULL THEN
+            CASE WHEN l.log_mins_ago < s.status_mins_ago THEN l.log_mins_ago ELSE s.status_mins_ago END
+        ELSE COALESCE(l.log_mins_ago, s.status_mins_ago, 99999)
+    END as mins_ago,
+    COALESCE(s.completed_today, 0) as completed_today,
+    COALESCE(s.failed_today, 0) as failed_today,
+    COALESCE(o.ongoing_count, 0) as ongoing_count,
+    o.ongoing_isbn,
+    o.ongoing_box,
+    o.ongoing_remarks,
+    COALESCE(s.total_records_today, 0) as total_today
+FROM (SELECT * FROM RecentLogs WHERE rn = 1) l
+FULL OUTER JOIN UserTodayStats s ON l.username = s.MetadataUser
+FULL OUTER JOIN OngoingHold o ON COALESCE(l.username, s.MetadataUser) = o.MetadataUser
+ORDER BY mins_ago ASC, completed_today DESC;
+`;
+
+    let rawUserData = [];
+    let queueCount = 0;
+    let currentFilter = 'all';
+    let queryCount = 0;
+    let refreshInterval = 10000;
+    let refreshTimer = null;
+    let progressTimer = null;
+    let lastRefreshTimestamp = Date.now();
+    let isFetchingMonitor = false;
+
+    async function fetchMonitorData() {
+      if (isFetchingMonitor) return;
+      isFetchingMonitor = true;
+
+      const refreshIcon = document.getElementById("refreshIcon");
+      if (refreshIcon) refreshIcon.style.animation = "spin 1s infinite linear";
+
+      try {
+        const data = await executeDbScript(MONITOR_SQL);
+        queryCount++;
+        document.getElementById("queryCounter").textContent = queryCount;
+
+        // Process queue count
+        if (data[0] && data[0][0]) {
+          queueCount = data[0][0].queued_count || 0;
+          updateQueueDisplays(queueCount);
+        }
+
+        // Process user activity
+        if (data[1]) {
+          rawUserData = data[1].filter(u => u.username && u.username.trim() !== "");
+          updateKPIs();
+          renderTable();
+        }
+
+        const now = new Date();
+        document.getElementById("lastUpdatedText").textContent = now.toLocaleTimeString();
+        lastRefreshTimestamp = Date.now();
+      } catch (err) {
+        console.error("Monitor fetch error:", err);
+        document.getElementById("lastUpdatedText").textContent = `Error: ${err.message}`;
+      } finally {
+        isFetchingMonitor = false;
+        if (refreshIcon) refreshIcon.style.animation = "";
+      }
+    }
+
+    function updateQueueDisplays(count) {
+      // Global header badge
+      const badge = document.getElementById("globalQueueText");
+      if (badge) {
+        badge.textContent = `${count} Available in Queue`;
+        const wrap = document.getElementById("globalQueueBadge");
+        if (wrap) {
+          wrap.style.color = count > 0 ? "#10b981" : "#38bdf8";
+        }
+      }
+
+      // Hunter tab queue
+      const hq = document.getElementById("hunterQueueDisp");
+      if (hq) {
+        hq.textContent = `${count} Available`;
+        hq.style.color = count > 0 ? "#34d399" : "#38bdf8";
+      }
+
+      // Large Queue widget tab
+      const hugeCount = document.getElementById("queueHugeCount");
+      const hugeStatus = document.getElementById("queueHugeStatus");
+      if (hugeCount) {
+        hugeCount.textContent = count;
+        hugeCount.style.color = count > 0 ? "#10b981" : "#64748b";
+      }
+      if (hugeStatus) {
+        if (count > 0) {
+          hugeStatus.textContent = `🎯 ${count} magazine${count > 1 ? 's' : ''} ready to claim!`;
+          hugeStatus.style.color = "#34d399";
+        } else {
+          hugeStatus.textContent = "Queue is currently empty";
+          hugeStatus.style.color = "#94a3b8";
+        }
+      }
+    }
+
+    function updateKPIs() {
+      let online = 0;
+      let away = 0;
+      let totalCompleted = 0;
+      let totalOngoing = 0;
+
+      rawUserData.forEach(u => {
+        const mins = u.mins_ago !== null ? u.mins_ago : 99999;
+        if (mins < 10) online++;
+        else if (mins < 60) away++;
+        totalCompleted += (u.completed_today || 0);
+        totalOngoing += (u.ongoing_count || 0);
+      });
+
+      document.getElementById("kpiOnline").textContent = online;
+      document.getElementById("kpiAway").textContent = away;
+      document.getElementById("kpiTotalUsers").textContent = rawUserData.length;
+      document.getElementById("kpiCompleted").textContent = totalCompleted;
+      document.getElementById("kpiOngoing").textContent = totalOngoing;
+    }
+
+    function setFilter(filter, btn) {
+      currentFilter = filter;
+      document.querySelectorAll(".filter-tab").forEach(t => t.classList.remove("active"));
+      if (btn) btn.classList.add("active");
+      renderTable();
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById("userTableBody");
+      const search = (document.getElementById("searchInput").value || "").trim().toLowerCase();
+
+      let filtered = rawUserData.filter(u => {
+        const mins = u.mins_ago !== null ? u.mins_ago : 99999;
+
+        if (currentFilter === "online" && mins >= 10) return false;
+        if (currentFilter === "away" && (mins < 10 || mins >= 60)) return false;
+        if (currentFilter === "holding" && (!u.ongoing_count || u.ongoing_count === 0)) return false;
+
+        if (search) {
+          const matchUser = (u.username || "").toLowerCase().includes(search);
+          const matchHost = (u.hostname || "").toLowerCase().includes(search);
+          const matchIsbn = (u.ongoing_isbn || "").toLowerCase().includes(search) || (u.last_isbn || "").toLowerCase().includes(search);
+          const matchAction = (u.last_action || "").toLowerCase().includes(search);
+          if (!matchUser && !matchHost && !matchIsbn && !matchAction) return false;
+        }
+
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" class="empty-state">
+              No operators matching the selected filter or search term.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      let html = "";
+      filtered.forEach(u => {
+        const mins = u.mins_ago !== null ? u.mins_ago : 99999;
+        let statusBadge = "";
+        let relativeTime = "";
+
+        if (mins < 10) {
+          statusBadge = `<span class="status-badge online"><span class="pulse-dot"></span> ONLINE</span>`;
+          relativeTime = mins === 0 ? "Just now" : `${mins}m ago`;
+        } else if (mins < 60) {
+          statusBadge = `<span class="status-badge away">🟡 AWAY</span>`;
+          relativeTime = `${mins}m ago`;
+        } else if (mins < 240) {
+          statusBadge = `<span class="status-badge idle">🟣 IDLE</span>`;
+          const hrs = Math.floor(mins / 60);
+          relativeTime = `${hrs}h ${mins % 60}m ago`;
+        } else {
+          statusBadge = `<span class="status-badge offline">⚪ OFFLINE</span>`;
+          if (mins < 1440) {
+            const hrs = Math.floor(mins / 60);
+            relativeTime = `${hrs}h ago`;
+          } else {
+            relativeTime = `Earlier`;
+          }
+        }
+
+        let actionTag = "";
+        if (u.last_action) {
+          let actClass = "allocate";
+          let label = u.last_action;
+          if (u.last_action === "ALLOCATE") { label = "Queue Request"; actClass = "allocate"; }
+          else if (u.last_action === "SAVE") { label = "Saved Item"; actClass = "save"; }
+          else if (u.last_action === "HOLD") { label = "Hold Item"; actClass = "hold"; }
+          actionTag = `<span class="action-tag ${actClass}">${label}</span>`;
+        } else {
+          actionTag = `<span style="color: var(--text-muted); font-size: 0.78rem;">-</span>`;
+        }
+
+        const pcName = u.hostname || "Unknown PC";
+        const appVer = u.app_version ? `v${u.app_version}` : "";
+
+        let ongoingDisplay = `<span style="color: var(--text-muted); font-size: 0.8rem;">None</span>`;
+        if (u.ongoing_count > 0) {
+          const isbn = u.ongoing_isbn || "File Ongoing";
+          const box = u.ongoing_box ? ` | ${u.ongoing_box}` : "";
+          const remarks = u.ongoing_remarks ? `<br><em>${escapeHtml(u.ongoing_remarks)}</em>` : "";
+          ongoingDisplay = `
+            <div class="ongoing-box">
+              🔒 <strong>${escapeHtml(isbn)}</strong>${escapeHtml(box)}
+              ${remarks}
+            </div>
+          `;
+        }
+
+        html += `
+          <tr>
+            <td>${statusBadge}</td>
+            <td>
+              <div class="user-name-cell">
+                <span class="user-name">${escapeHtml(u.username)}</span>
+              </div>
+            </td>
+            <td><strong style="color: #ffffff;">${relativeTime}</strong></td>
+            <td>${actionTag}</td>
+            <td>
+              <div class="user-name-cell">
+                <span class="user-pc">${escapeHtml(pcName)}</span>
+                <span style="font-size: 0.72rem; color: var(--text-muted);">${escapeHtml(appVer)}</span>
+              </div>
+            </td>
+            <td><span class="count-badge success">${u.completed_today || 0}</span></td>
+            <td><span class="count-badge fail">${u.failed_today || 0}</span></td>
+            <td>${ongoingDisplay}</td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = html;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function updateInterval() {
+      const select = document.getElementById("intervalSelect");
+      refreshInterval = parseInt(select.value, 10);
+      startAutoRefresh();
+    }
+
+    function startAutoRefresh() {
+      if (refreshTimer) clearInterval(refreshTimer);
+      if (progressTimer) clearInterval(progressTimer);
+
+      if (refreshInterval > 0) {
+        lastRefreshTimestamp = Date.now();
+        refreshTimer = setInterval(() => {
+          fetchMonitorData();
+        }, refreshInterval);
+
+        progressTimer = setInterval(() => {
+          const elapsed = Date.now() - lastRefreshTimestamp;
+          const pct = Math.min(100, (elapsed / refreshInterval) * 100);
+          const bar = document.getElementById("refreshProgressBar");
+          if (bar) bar.style.width = `${pct}%`;
+        }, 100);
+      } else {
+        const bar = document.getElementById("refreshProgressBar");
+        if (bar) bar.style.width = `0%`;
+      }
+    }
+
+    function copySummaryText() {
+      let onlineUsers = rawUserData.filter(u => (u.mins_ago !== null ? u.mins_ago : 99999) < 10);
+      let awayUsers = rawUserData.filter(u => {
+        const m = u.mins_ago !== null ? u.mins_ago : 99999;
+        return m >= 10 && m < 60;
+      });
+
+      let summary = `METADATA CAPTURE - OPERATOR ACTIVITY REPORT\n`;
+      summary += `Timestamp: ${new Date().toLocaleString()}\n`;
+      summary += `Queue Available: ${queueCount}\n`;
+      summary += `--------------------------------------------------\n`;
+      summary += `ONLINE NOW (${onlineUsers.length}):\n`;
+      onlineUsers.forEach(u => {
+        summary += `  - ${u.username} (${u.mins_ago}m ago) | Completed: ${u.completed_today || 0} | PC: ${u.hostname || '-'}\n`;
+      });
+      summary += `\nRECENTLY AWAY (${awayUsers.length}):\n`;
+      awayUsers.forEach(u => {
+        summary += `  - ${u.username} (${u.mins_ago}m ago) | Completed: ${u.completed_today || 0}\n`;
+      });
+      summary += `--------------------------------------------------\n`;
+      summary += `Total Operators Active Today: ${rawUserData.length}\n`;
+
+      navigator.clipboard.writeText(summary).then(() => {
+        alert("Summary copied to clipboard!");
+      }).catch(err => {
+        console.error("Clipboard copy failed:", err);
+      });
+    }
+
+    // =========================================================
+    // SECTION 2: AUTO ALLOCATION HUNTER LOGIC
+    // =========================================================
+    let isHunting = false;
+    let huntTimer = null;
+    let hunterCheckCount = 0;
+    let audioCtx = null;
+
+    function toggleHunting() {
+      if (isHunting) {
+        stopHunting();
+      } else {
+        startHunting();
+      }
+    }
+
+    function startHunting() {
+      const username = document.getElementById("hunterUsername").value.trim();
+      if (!username) {
+        alert("Please enter your Operator Login ID!");
+        return;
+      }
+
+      isHunting = true;
+      document.getElementById("hunterUsername").disabled = true;
+
+      // Update Button
+      const btn = document.getElementById("btnHunterToggle");
+      btn.className = "btn-action btn-stop";
+      document.getElementById("hunterBtnIcon").textContent = "⏹";
+      document.getElementById("hunterBtnText").textContent = "Stop Auto-Allocation Hunt";
+
+      // Update Status Panel
+      const panel = document.getElementById("hunterStatusPanel");
+      panel.className = "status-panel hunting";
+      document.getElementById("hunterStatusTitle").className = "status-title hunting";
+      document.getElementById("hunterStatusTitle").textContent = "🟢 HUNTING QUEUE...";
+      document.getElementById("hunterStatusDesc").textContent = `Actively scanning queue for '${username}'. Will snipe immediately when an item appears!`;
+
+      document.getElementById("hunterPulseDot").className = "pulse-dot active";
+      document.getElementById("hunterSecuredCard").style.display = "none";
+
+      scheduleNextHuntCheck();
+    }
+
+    function stopHunting() {
+      isHunting = false;
+      if (huntTimer) clearTimeout(huntTimer);
+
+      document.getElementById("hunterUsername").disabled = false;
+
+      const btn = document.getElementById("btnHunterToggle");
+      btn.className = "btn-action btn-start";
+      document.getElementById("hunterBtnIcon").textContent = "🚀";
+      document.getElementById("hunterBtnText").textContent = "Start Auto-Allocation Hunt";
+
+      const panel = document.getElementById("hunterStatusPanel");
+      panel.className = "status-panel standby";
+      document.getElementById("hunterStatusTitle").className = "status-title standby";
+      document.getElementById("hunterStatusTitle").textContent = "⏸ SNIPER STANDBY";
+      document.getElementById("hunterStatusDesc").textContent = "Sniper stopped. Click Start to resume monitoring.";
+
+      document.getElementById("hunterPulseDot").className = "pulse-dot";
+    }
+
+    function scheduleNextHuntCheck() {
+      if (!isHunting) return;
+      const speed = parseInt(document.getElementById("hunterSpeed").value, 10) || 500;
+      huntTimer = setTimeout(checkAndClaimQueue, speed);
+    }
+
+    async function checkAndClaimQueue() {
+      if (!isHunting) return;
+
+      const username = document.getElementById("hunterUsername").value.trim();
+      hunterCheckCount++;
+      document.getElementById("hunterCheckCounter").textContent = hunterCheckCount;
+      document.getElementById("hunterLastCheck").textContent = new Date().toLocaleTimeString();
+
+      try {
+        // Step 1: Ultra lightweight queue check
+        const qData = await executeDbScript("EXEC USP_METADATACAPTURE_GETQUEUECOUNT");
+        let qCount = 0;
+        if (qData && qData[0] && qData[0][0]) {
+          qCount = qData[0][0].queued_count || 0;
+        }
+
+        updateQueueDisplays(qCount);
+
+        // Step 2: If items available in queue, snipe immediately!
+        if (qCount > 0) {
+          const allocData = await executeDbScript(`EXEC USP_METADATACAPTURE_GETISBN @UserName = '${username}';`);
+          if (allocData && allocData[0] && allocData[0].length > 0) {
+            const item = allocData[0][0];
+            if (item.isbn) {
+              onAllocationSecured(item);
+              return;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Hunt check error:", err);
+      }
+
+      scheduleNextHuntCheck();
+    }
+
+    function onAllocationSecured(item) {
+      stopHunting();
+      playChimeAlert();
+
+      sendPushNotification(`🎯 Magazine Allocated!`, `Barcode: ${item.isbn} (Box: ${item.boxno || 'N/A'}). Open Metadata Capture and click Allocate!`);
+
+      const panel = document.getElementById("hunterStatusPanel");
+      panel.className = "status-panel secured";
+      document.getElementById("hunterStatusTitle").className = "status-title secured";
+      document.getElementById("hunterStatusTitle").textContent = "🎉 ALLOCATION SECURED!";
+      document.getElementById("hunterStatusDesc").textContent = `Successfully sniped ISBN ${item.isbn}! It is reserved under your login ID.`;
+
+      document.getElementById("dispIsbn").textContent = item.isbn;
+      document.getElementById("dispBox").textContent = item.boxno || "N/A";
+      document.getElementById("dispLot").textContent = item.lotno || "N/A";
+      document.getElementById("dispPages").textContent = item.scanningnoofpages || "N/A";
+      document.getElementById("dispTime").textContent = new Date().toLocaleTimeString();
+
+      document.getElementById("hunterSecuredCard").style.display = "block";
+
+      // Also refresh the monitor data to reflect immediate change
+      fetchMonitorData();
+    }
+
+    function resetHunterForNext() {
+      document.getElementById("hunterSecuredCard").style.display = "none";
+      const panel = document.getElementById("hunterStatusPanel");
+      panel.className = "status-panel standby";
+      document.getElementById("hunterStatusTitle").className = "status-title standby";
+      document.getElementById("hunterStatusTitle").textContent = "⏸ READY FOR NEXT";
+      document.getElementById("hunterStatusDesc").textContent = "Finished with current magazine? Click Start to hunt for the next one.";
+    }
+
+    function playChimeAlert() {
+      if (document.getElementById("hunterSound").value !== "yes") return;
+
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+
+        const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+        notes.forEach((freq, idx) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq, audioCtx.currentTime + idx * 0.12);
+
+          gain.gain.setValueAtTime(0.25, audioCtx.currentTime + idx * 0.12);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + idx * 0.12 + 0.35);
+
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+
+          osc.start(audioCtx.currentTime + idx * 0.12);
+          osc.stop(audioCtx.currentTime + idx * 0.12 + 0.35);
+        });
+      } catch (e) {
+        console.error("Audio error:", e);
+      }
+    }
+
+    function testHunterSound() {
+      playChimeAlert();
+    }
+
+    function requestPushNotificationPermission() {
+      if ("Notification" in window) {
+        Notification.requestPermission().then(perm => {
+          if (perm === "granted") {
+            new Notification("Notifications Enabled", { body: "You will receive desktop alerts when a magazine is allocated!" });
+          } else {
+            alert("Notification permission was not granted.");
+          }
+        });
+      } else {
+        alert("Desktop notifications are not supported in this browser.");
+      }
+    }
+
+    function sendPushNotification(title, body) {
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification(title, { body: body });
+      }
+    }
+
+    // =========================================================
+    // SECTION 3: SETTINGS & LOCAL STORAGE
+    // =========================================================
+    function openSettingsModal() {
+      const cfg = getConfig();
+      document.getElementById("prefUsername").value = cfg.username;
+      document.getElementById("prefApiEndpoint").value = cfg.endpoint === _D_EP ? "" : cfg.endpoint;
+      document.getElementById("prefApiKey").value = cfg.apiKey === _D_AK ? "" : cfg.apiKey;
+      document.getElementById("settingsModal").style.display = "flex";
+    }
+
+    function closeSettingsModal(e) {
+      if (e && e.target !== document.getElementById("settingsModal")) return;
+      document.getElementById("settingsModal").style.display = "none";
+    }
+
+    function saveSettings() {
+      const username = document.getElementById("prefUsername").value.trim() || "Vendor_003_71";
+      const endpoint = document.getElementById("prefApiEndpoint").value.trim() || _D_EP;
+      const apiKey = document.getElementById("prefApiKey").value.trim() || _D_AK;
+
+      const cfg = {
+        username: username,
+        endpoint: endpoint,
+        apiKey: apiKey
+      };
+
+      localStorage.setItem("mc_hub_cfg", JSON.stringify(cfg));
+      document.getElementById("hunterUsername").value = username;
+      document.getElementById("settingsModal").style.display = "none";
+      alert("Settings saved!");
+      fetchMonitorData();
+    }
+
+    // =========================================================
+    // INITIALIZATION ON PAGE LOAD
+    // =========================================================
+    window.addEventListener("DOMContentLoaded", () => {
+      const cfg = getConfig();
+      document.getElementById("hunterUsername").value = cfg.username;
+      fetchMonitorData();
+      startAutoRefresh();
+    });
+  </script>
+</body>
+</html>

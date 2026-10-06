@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Queue Monitor - Metadata Capture</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: rgba(30, 41, 59, 0.75);
+      --border: rgba(148, 163, 184, 0.15);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --success: #10b981;
+      --success-bg: rgba(16, 185, 129, 0.15);
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --empty: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 20%, #1e293b, var(--bg));
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .monitor-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      width: 100%;
+      max-width: 500px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+
+    .top-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      color: var(--accent);
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 10px var(--accent);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.95); opacity: 0.7; }
+      50% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 14px var(--accent); }
+      100% { transform: scale(0.95); opacity: 0.7; }
+    }
+
+    .title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 24px;
+      letter-spacing: -0.02em;
+    }
+
+    .status-panel {
+      border-radius: 16px;
+      padding: 26px 20px;
+      margin-bottom: 24px;
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .status-panel.empty {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px dashed rgba(148, 163, 184, 0.2);
+    }
+
+    .status-panel.available {
+      background: var(--success-bg);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      box-shadow: 0 0 30px rgba(16, 185, 129, 0.2);
+    }
+
+    .count-number {
+      font-size: 4.8rem;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 8px;
+      letter-spacing: -0.04em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .count-number.empty { color: var(--empty); }
+    .count-number.available {
+      color: var(--success);
+      text-shadow: 0 0 24px rgba(16, 185, 129, 0.4);
+    }
+
+    .status-msg {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .status-msg.empty { color: var(--text-muted); }
+    .status-msg.available { color: #34d399; }
+
+    .status-sub {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .control-box {
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      text-align: left;
+    }
+
+    .control-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    select {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+    }
+
+    .switch input { opacity: 0; width: 0; height: 0; }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #334155;
+      transition: .3s;
+      border-radius: 24px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider { background-color: var(--success); }
+    input:checked + .slider:before { transform: translateX(20px); }
+
+    .action-btn {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .btn-toggle {
+      background: #2563eb;
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+    }
+
+    .btn-toggle:hover { background: #1d4ed8; }
+
+    .btn-test {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .btn-test:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .stats-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="monitor-card">
+    <div class="top-badge">
+      <span class="pulse-dot" id="pulseIndicator"></span>
+      <span id="badgeText">Live Cloud Sync</span>
+    </div>
+
+    <h1 class="title">Metadata Capture Queue Monitor</h1>
+
+    <div class="status-panel empty" id="statusPanel">
+      <div class="count-number empty" id="countDisplay">0</div>
+      <div class="status-msg empty" id="statusMsg">Queue Empty (0 Available)</div>
+      <div class="status-sub" id="statusSub">Waiting for new allocation batch...</div>
+    </div>
+
+    <div class="controls-grid">
+      <div class="control-box">
+        <span class="control-label">Interval Speed</span>
+        <select id="intervalSelect" onchange="updateInterval()">
+          <option value="1000" selected>1.0s (Safe All-Day)</option>
+          <option value="500">0.5s (Fast)</option>
+          <option value="300">0.3s (Turbo Speed)</option>
+          <option value="2000">2.0s (Relaxed)</option>
+          <option value="4000">4.0s (Standard)</option>
+        </select>
+      </div>
+
+      <div class="control-box">
+        <span class="control-label">Audio Alert</span>
+        <div class="toggle-row">
+          <span style="font-size: 0.85rem;" id="soundStateLabel">Enabled</span>
+          <label class="switch">
+            <input type="checkbox" id="soundToggle" checked onchange="toggleSound()">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <button class="action-btn btn-toggle" id="btnPause" onclick="togglePause()">
+      <span id="btnIcon">⏸</span> <span id="btnText">Pause Monitoring</span>
+    </button>
+
+    <div style="display: flex; justify-content: center; gap: 10px; margin-bottom: 8px;">
+      <button class="btn-test" onclick="playAlertSound(true)">🔔 Test Sound Alert</button>
+      <button class="btn-test" onclick="requestNotificationPermission()">📲 Enable Browser Alert</button>
+      <a href="index.html" class="btn-test" style="text-decoration: none;">📊 Main Dashboard</a>
+    </div>
+
+    <div class="footer">
+      <div class="stats-item">
+        <span>⏱ Last check:</span>
+        <strong id="lastCheckedTime">Connecting...</strong>
+      </div>
+      <div class="stats-item">
+        <span>⚡ Checks:</span>
+        <strong id="checkCounter">0</strong>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_ENDPOINT = atob("aHR0cHM6Ly91c3NpbWZsZXguaW5ub2RhdGEuY29tL0RiQ29ubmVjdG9yL2FwaS9kYi9HZXREYXRhYmFzZURhdGFTZXQ=");
+    const PAYLOAD = JSON.stringify({
+      applicationName: "Metadata Capture",
+      configName: "MAGAZINE",
+      configKey: atob("MmNjODVlNGItMzM4NC00N2M4LWFiOTYtMzk5YzBlYzFkYmFl"),
+      script: "EXEC USP_METADATACAPTURE_GETQUEUECOUNT"
+    });
+    const HEADERS = {
+      "Content-Type": "application/json",
+      "XAPIKey": atob("T0FwMVRQUEZMM0dVMjZzRWFiVkNFSmRvMWliZTZmRWl2S1FtWFYwRzhSbHBlQm5tQlFxYklaRmZpZE1oUEZXcA==")
+    };
+
+    let isMonitoring = true;
+    let pollIntervalMs = 1000;
+    let pollTimer = null;
+    let lastCount = 0;
+    let totalChecks = 0;
+    let audioCtx = null;
+
+    function initAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function playAlertSound(isTest = false) {
+      try {
+        initAudioContext();
+        if (!audioCtx) return;
+
+        const now = audioCtx.currentTime;
+        const osc1 = audioCtx.createOscillator();
+        const osc2 = audioCtx.createOscillator();
+        const gain1 = audioCtx.createGain();
+        const gain2 = audioCtx.createGain();
+
+        osc1.type = "sine";
+        osc1.frequency.setValueAtTime(880, now);
+        gain1.gain.setValueAtTime(0.25, now);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+        osc1.connect(gain1);
+        gain1.connect(audioCtx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.35);
+
+        osc2.type = "sine";
+        osc2.frequency.setValueAtTime(1320, now + 0.12);
+        gain2.gain.setValueAtTime(0.3, now + 0.12);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+        osc2.connect(gain2);
+        gain2.connect(audioCtx.destination);
+        osc2.start(now + 0.12);
+        osc2.stop(now + 0.6);
+
+        if (Notification.permission === "granted" && !isTest) {
+          new Notification("MAGAZINE AVAILABLE!", {
+            body: "Metadata Capture queue is ready. Click 'Get Allocation' now!"
+          });
+        }
+      } catch (e) {
+        console.error("Audio playback error:", e);
+      }
+    }
+
+    async function checkQueue() {
+      if (!isMonitoring) return;
+
+      totalChecks++;
+      document.getElementById("checkCounter").textContent = totalChecks;
+      document.getElementById("lastCheckedTime").textContent = new Date().toLocaleTimeString();
+
+      try {
+        const response = await fetch(API_ENDPOINT, {
+          method: "POST",
+          headers: HEADERS,
+          body: PAYLOAD
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        let count = 0;
+        if (data && data[0] && data[0][0]) {
+          count = data[0][0].queued_count || 0;
+        }
+
+        updateUI(count);
+      } catch (err) {
+        console.warn("Queue check error:", err);
+      }
+
+      if (isMonitoring) {
+        pollTimer = setTimeout(checkQueue, pollIntervalMs);
+      }
+    }
+
+    function updateUI(count) {
+      const panel = document.getElementById("statusPanel");
+      const countEl = document.getElementById("countDisplay");
+      const msgEl = document.getElementById("statusMsg");
+      const subEl = document.getElementById("statusSub");
+
+      countEl.textContent = count;
+
+      if (count > 0) {
+        panel.className = "status-panel available";
+        countEl.className = "count-number available";
+        msgEl.className = "status-msg available";
+        msgEl.textContent = `🎯 ${count} MAGAZINE${count > 1 ? 'S' : ''} READY!`;
+        subEl.textContent = "Magazines available in queue! Claim your allocation now.";
+
+        if (lastCount === 0 && document.getElementById("soundToggle").checked) {
+          playAlertSound();
+        }
+      } else {
+        panel.className = "status-panel empty";
+        countEl.className = "count-number empty";
+        msgEl.className = "status-msg empty";
+        msgEl.textContent = "Queue Empty (0 Available)";
+        subEl.textContent = "Waiting for new allocation batch...";
+      }
+
+      lastCount = count;
+    }
+
+    function togglePause() {
+      isMonitoring = !isMonitoring;
+      const btn = document.getElementById("btnPause");
+      const dot = document.getElementById("pulseIndicator");
+      const badgeText = document.getElementById("badgeText");
+
+      if (isMonitoring) {
+        btn.innerHTML = `<span>⏸</span> <span>Pause Monitoring</span>`;
+        btn.style.background = "#2563eb";
+        dot.style.display = "block";
+        badgeText.textContent = "Live Cloud Sync";
+        checkQueue();
+      } else {
+        clearTimeout(pollTimer);
+        btn.innerHTML = `<span>▶️</span> <span>Resume Monitoring</span>`;
+        btn.style.background = "#059669";
+        dot.style.display = "none";
+        badgeText.textContent = "Paused";
+      }
+    }
+
+    function updateInterval() {
+      pollIntervalMs = parseInt(document.getElementById("intervalSelect").value, 10);
+    }
+
+    function toggleSound() {
+      const isChecked = document.getElementById("soundToggle").checked;
+      document.getElementById("soundStateLabel").textContent = isChecked ? "Enabled" : "Muted";
+    }
+
+    function requestNotificationPermission() {
+      if ("Notification" in window) {
+        Notification.requestPermission().then(permission => {
+          if (permission === "granted") {
+            new Notification("Notifications Enabled", {
+              body: "You will be alerted when a magazine enters the queue!"
+            });
+          }
+        });
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      checkQueue();
+    });
+  </script>
+</body>
+</html>

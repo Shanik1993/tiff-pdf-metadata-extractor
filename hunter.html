@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auto Allocation Sniper - Metadata Capture</title>
+  <style>
+    :root {
+      --bg: #0b1120;
+      --card-bg: rgba(17, 24, 39, 0.78);
+      --border: rgba(148, 163, 184, 0.15);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --success: #10b981;
+      --success-glow: rgba(16, 185, 129, 0.35);
+      --warning: #f59e0b;
+      --danger: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 20%, #1e293b, var(--bg));
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .sniper-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      width: 100%;
+      max-width: 520px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      text-align: center;
+      position: relative;
+    }
+
+    .top-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      color: var(--accent);
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 10px var(--accent);
+      animation: pulse 1.5s infinite;
+    }
+
+    .pulse-dot.active {
+      background: var(--success);
+      box-shadow: 0 0 12px var(--success);
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.95); opacity: 0.7; }
+      50% { transform: scale(1.25); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.7; }
+    }
+
+    .title {
+      font-size: 1.45rem;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 6px;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 22px;
+    }
+
+    .config-box {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 20px;
+      text-align: left;
+    }
+
+    .input-row {
+      margin-bottom: 12px;
+    }
+
+    .input-label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .text-input {
+      width: 100%;
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid var(--border);
+      color: #ffffff;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      outline: none;
+    }
+
+    .settings-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .select-input {
+      width: 100%;
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid var(--border);
+      color: #ffffff;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .status-panel {
+      border-radius: 14px;
+      padding: 20px 16px;
+      margin-bottom: 20px;
+      transition: all 0.3s ease;
+    }
+
+    .status-panel.standby {
+      background: rgba(30, 41, 59, 0.4);
+      border: 1px dashed rgba(148, 163, 184, 0.2);
+    }
+
+    .status-panel.hunting {
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
+    }
+
+    .status-panel.secured {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      box-shadow: 0 0 30px rgba(56, 189, 248, 0.2);
+    }
+
+    .status-title {
+      font-size: 1.1rem;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    .status-title.standby { color: var(--text-muted); }
+    .status-title.hunting { color: var(--success); }
+    .status-title.secured { color: var(--accent); }
+
+    .status-desc {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .secured-card {
+      display: none;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      border-radius: 10px;
+      padding: 14px;
+      margin-top: 14px;
+      text-align: left;
+    }
+
+    .secured-item-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 0.82rem;
+    }
+
+    .secured-item-row:last-child {
+      border-bottom: none;
+    }
+
+    .secured-item-row span {
+      color: var(--text-muted);
+    }
+
+    .secured-item-row strong {
+      color: #ffffff;
+    }
+
+    .btn-action {
+      width: 100%;
+      padding: 14px 20px;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-start {
+      background: #10b981;
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+    }
+
+    .btn-start:hover {
+      background: #059669;
+    }
+
+    .btn-stop {
+      background: #ef4444;
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);
+    }
+
+    .btn-stop:hover {
+      background: #dc2626;
+    }
+
+    .btn-sub {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .btn-sub:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="sniper-card">
+    <div class="top-badge">
+      <span class="pulse-dot" id="pulseDot"></span>
+      <span id="badgeText">Auto-Allocation Sniper</span>
+    </div>
+
+    <h1 class="title">Automatic Queue Allocation</h1>
+    <p class="subtitle">Snipes magazines the millisecond they appear in the queue</p>
+
+    <!-- Configuration -->
+    <div class="config-box">
+      <div class="input-row">
+        <label class="input-label" for="usernameInput">Your Login ID</label>
+        <input type="text" id="usernameInput" class="text-input" value="Vendor_003_71">
+      </div>
+
+      <div class="settings-grid">
+        <div class="input-row" style="margin-bottom: 0;">
+          <label class="input-label" for="speedSelect">Hunt Speed</label>
+          <select id="speedSelect" class="select-input">
+            <option value="300">300ms (Turbo Speed)</option>
+            <option value="500" selected>500ms (Fast)</option>
+            <option value="1000">1000ms (Safe All-Day)</option>
+            <option value="2000">2000ms (Relaxed)</option>
+          </select>
+        </div>
+
+        <div class="input-row" style="margin-bottom: 0;">
+          <label class="input-label" for="soundSelect">Audio Alert</label>
+          <select id="soundSelect" class="select-input">
+            <option value="yes" selected>🔔 Enabled (Chime)</option>
+            <option value="no">🔕 Muted</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status Panel -->
+    <div class="status-panel standby" id="statusPanel">
+      <div class="status-title standby" id="statusTitle">⏸ SNIPER STANDBY</div>
+      <div class="status-desc" id="statusDesc">
+        Click 'Start Auto-Allocation' to monitor the database queue.
+      </div>
+
+      <!-- Secured Item Card -->
+      <div class="secured-card" id="securedCard">
+        <div style="font-weight: 700; color: #34d399; margin-bottom: 10px; font-size: 0.95rem;">
+          🎯 MAGAZINE SECURED FOR YOUR LOGIN ID!
+        </div>
+        <div class="secured-item-row">
+          <span>Barcode (ISBN):</span>
+          <strong id="dispIsbn">-</strong>
+        </div>
+        <div class="secured-item-row">
+          <span>Box Number:</span>
+          <strong id="dispBox">-</strong>
+        </div>
+        <div class="secured-item-row">
+          <span>Lot Number:</span>
+          <strong id="dispLot">-</strong>
+        </div>
+        <div class="secured-item-row">
+          <span>Page Count:</span>
+          <strong id="dispPages">-</strong>
+        </div>
+        <div class="secured-item-row">
+          <span>Secured At:</span>
+          <strong id="dispTime">-</strong>
+        </div>
+        <div style="margin-top: 12px; text-align: center;">
+          <button class="btn-sub" style="color: #34d399; border-color: rgba(16, 185, 129, 0.4);" onclick="resetForNext()">
+            ✅ Done with this item? Hunt for Next
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Action Button -->
+    <button class="btn-action btn-start" id="btnToggle" onclick="toggleHunting()">
+      <span id="btnIcon">🚀</span> <span id="btnText">Start Auto-Allocation Hunt</span>
+    </button>
+
+    <div style="display: flex; justify-content: center; gap: 10px; margin-top: 12px;">
+      <button class="btn-sub" onclick="testSoundAlert()">🔔 Test Alarm</button>
+      <button class="btn-sub" onclick="requestNotificationPermission()">📲 Enable Push Alerts</button>
+      <a href="index.html" class="btn-sub" style="text-decoration: none;">📊 Open Monitor Hub</a>
+    </div>
+
+    <div class="footer">
+      <div>
+        <span>📦 Queue: </span>
+        <strong id="queueDisp" style="color: #38bdf8;">0 Available</strong>
+      </div>
+      <div>
+        <span>⚡ Checks: </span>
+        <strong id="checkCounter" style="color: #ffffff;">0</strong>
+      </div>
+      <div>
+        <span>⏱ Last: </span>
+        <strong id="lastCheckTime" style="color: #ffffff;">-</strong>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_ENDPOINT = atob("aHR0cHM6Ly91c3NpbWZsZXguaW5ub2RhdGEuY29tL0RiQ29ubmVjdG9yL2FwaS9kYi9HZXREYXRhYmFzZURhdGFTZXQ=");
+    const HEADERS = {
+      "Content-Type": "application/json",
+      "XAPIKey": atob("T0FwMVRQUEZMM0dVMjZzRWFiVkNFSmRvMWliZTZmRWl2S1FtWFYwRzhSbHBlQm5tQlFxYklaRmZpZE1oUEZXcA==")
+    };
+
+    let isHunting = false;
+    let huntTimer = null;
+    let checkCount = 0;
+    let audioCtx = null;
+
+    async function executeQuery(script) {
+      const payload = {
+        applicationName: "Metadata Capture",
+        configName: "MAGAZINE",
+        configKey: atob("MmNjODVlNGItMzM4NC00N2M4LWFiOTYtMzk5YzBlYzFkYmFl"),
+        script: script
+      };
+
+      const res = await fetch(API_ENDPOINT, {
+        method: "POST",
+        headers: HEADERS,
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      return await res.json();
+    }
+
+    function toggleHunting() {
+      if (isHunting) {
+        stopHunting();
+      } else {
+        startHunting();
+      }
+    }
+
+    function startHunting() {
+      const username = document.getElementById("usernameInput").value.trim();
+      if (!username) {
+        alert("Please enter your Login ID!");
+        return;
+      }
+
+      isHunting = true;
+      document.getElementById("usernameInput").disabled = true;
+
+      const btn = document.getElementById("btnToggle");
+      btn.className = "btn-action btn-stop";
+      document.getElementById("btnIcon").textContent = "⏹";
+      document.getElementById("btnText").textContent = "Stop Auto-Allocation Hunt";
+
+      const panel = document.getElementById("statusPanel");
+      panel.className = "status-panel hunting";
+      document.getElementById("statusTitle").className = "status-title hunting";
+      document.getElementById("statusTitle").textContent = "🟢 HUNTING QUEUE...";
+      document.getElementById("statusDesc").textContent = `Actively scanning queue for '${username}'. Will claim instantly upon queue arrival!`;
+
+      document.getElementById("pulseDot").className = "pulse-dot active";
+      document.getElementById("securedCard").style.display = "none";
+
+      scheduleNextCheck();
+    }
+
+    function stopHunting() {
+      isHunting = false;
+      if (huntTimer) clearTimeout(huntTimer);
+
+      document.getElementById("usernameInput").disabled = false;
+
+      const btn = document.getElementById("btnToggle");
+      btn.className = "btn-action btn-start";
+      document.getElementById("btnIcon").textContent = "🚀";
+      document.getElementById("btnText").textContent = "Start Auto-Allocation Hunt";
+
+      const panel = document.getElementById("statusPanel");
+      panel.className = "status-panel standby";
+      document.getElementById("statusTitle").className = "status-title standby";
+      document.getElementById("statusTitle").textContent = "⏸ SNIPER STANDBY";
+      document.getElementById("statusDesc").textContent = "Sniper stopped. Click Start to resume.";
+
+      document.getElementById("pulseDot").className = "pulse-dot";
+    }
+
+    function scheduleNextCheck() {
+      if (!isHunting) return;
+      const speed = parseInt(document.getElementById("speedSelect").value, 10) || 500;
+      huntTimer = setTimeout(checkAndClaim, speed);
+    }
+
+    async function checkAndClaim() {
+      if (!isHunting) return;
+
+      const username = document.getElementById("usernameInput").value.trim();
+      checkCount++;
+      document.getElementById("checkCounter").textContent = checkCount;
+      document.getElementById("lastCheckTime").textContent = new Date().toLocaleTimeString();
+
+      try {
+        const qData = await executeQuery("EXEC USP_METADATACAPTURE_GETQUEUECOUNT");
+        let qCount = 0;
+        if (qData && qData[0] && qData[0][0]) {
+          qCount = qData[0][0].queued_count || 0;
+        }
+
+        const qDisp = document.getElementById("queueDisp");
+        qDisp.textContent = `${qCount} Available`;
+        qDisp.style.color = qCount > 0 ? "#34d399" : "#38bdf8";
+
+        if (qCount > 0) {
+          const allocData = await executeQuery(`EXEC USP_METADATACAPTURE_GETISBN @UserName = '${username}';`);
+          if (allocData && allocData[0] && allocData[0].length > 0) {
+            const item = allocData[0][0];
+            if (item.isbn) {
+              onAllocationSecured(item);
+              return;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Hunt check error:", err);
+      }
+
+      scheduleNextCheck();
+    }
+
+    function onAllocationSecured(item) {
+      stopHunting();
+      playVictorySound();
+      sendNotification(`🎯 Magazine Allocated!`, `ISBN: ${item.isbn} (Box: ${item.boxno || 'N/A'}). Open Metadata Capture and click Allocate!`);
+
+      const panel = document.getElementById("statusPanel");
+      panel.className = "status-panel secured";
+      document.getElementById("statusTitle").className = "status-title secured";
+      document.getElementById("statusTitle").textContent = "🎉 ALLOCATION SECURED!";
+      document.getElementById("statusDesc").textContent = `Successfully sniped ISBN ${item.isbn}! Open Metadata Capture and click 'Allocate' to work on it now.`;
+
+      document.getElementById("dispIsbn").textContent = item.isbn;
+      document.getElementById("dispBox").textContent = item.boxno || "N/A";
+      document.getElementById("dispLot").textContent = item.lotno || "N/A";
+      document.getElementById("dispPages").textContent = item.scanningnoofpages || "N/A";
+      document.getElementById("dispTime").textContent = new Date().toLocaleTimeString();
+
+      document.getElementById("securedCard").style.display = "block";
+    }
+
+    function resetForNext() {
+      document.getElementById("securedCard").style.display = "none";
+      const panel = document.getElementById("statusPanel");
+      panel.className = "status-panel standby";
+      document.getElementById("statusTitle").className = "status-title standby";
+      document.getElementById("statusTitle").textContent = "⏸ READY FOR NEXT";
+      document.getElementById("statusDesc").textContent = "Finished with previous item? Click Start to hunt for the next one.";
+    }
+
+    function playVictorySound() {
+      if (document.getElementById("soundSelect").value !== "yes") return;
+
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((freq, idx) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq, audioCtx.currentTime + idx * 0.12);
+
+          gain.gain.setValueAtTime(0.25, audioCtx.currentTime + idx * 0.12);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + idx * 0.12 + 0.35);
+
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+
+          osc.start(audioCtx.currentTime + idx * 0.12);
+          osc.stop(audioCtx.currentTime + idx * 0.12 + 0.35);
+        });
+      } catch (e) {
+        console.error("Audio error:", e);
+      }
+    }
+
+    function testSoundAlert() {
+      playVictorySound();
+    }
+
+    function requestNotificationPermission() {
+      if ("Notification" in window) {
+        Notification.requestPermission().then(perm => {
+          if (perm === "granted") {
+            new Notification("Notifications Enabled", { body: "You will be alerted when a magazine is allocated!" });
+          }
+        });
+      }
+    }
+
+    function sendNotification(title, body) {
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification(title, { body: body });
+      }
+    }
+  </script>
+</body>
+</html>

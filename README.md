@@ -1,13 +1,27 @@
-# TIFF and PDF Metadata Extractor
+# TIFF and PDF Metadata Extractor & Live Web Tools
 
-A comprehensive Python GUI application for extracting and analyzing metadata from TIFF images and PDF files. Export results to Excel with detailed file information and validation.
+A comprehensive toolkit for metadata extraction, file validation, plus a **Live Web Monitor & Auto Allocation Hunter** web application.
 
+[![GitHub Pages](https://img.shields.io/badge/Live%20Web%20App-GitHub%20Pages-brightgreen)](https://shanik1993.github.io/tiff-pdf-metadata-extractor/)
 ![Python](https://img.shields.io/badge/Python-3.7%2B-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
-![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Mac%20%7C%20Linux-lightgrey)
+![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Mac%20%7C%20Linux%20%7C%20Web-lightgrey)
+
+---
+
+### 🌐 Live Web Tools (Browser-Based)
+
+Access the live dashboard directly in any browser: **[Open Live Web Suite](https://shanik1993.github.io/tiff-pdf-metadata-extractor/)**
+
+- **📊 Real-time User & Queue Monitor**: Track operator online/away presence, today's completions, held/ongoing files, and team productivity in real time.
+- **🎯 Auto-Allocation Hunter / Sniper**: Automatically scans and snipes queue items instantly when they appear, with synthesized chime alerts and browser notifications.
+- **📦 Live Queue Radar**: Instant zero-lag queue availability count widget.
+
+---
 
 ## 📋 Table of Contents
 
+- [Live Web Tools](#-live-web-tools-browser-based)
 - [Features](#features)
 - [Screenshots](#screenshots)
 - [Installation](#installation)
