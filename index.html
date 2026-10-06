@@ -841,11 +841,126 @@
       from { transform: rotate(0deg); }
       to { transform: rotate(360deg); }
     }
+
+    /* Private Access Security Gate */
+    .auth-gate-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: radial-gradient(circle at 50% 30%, #1e293b, #0b1120 85%);
+      z-index: 99999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .auth-gate-card {
+      background: rgba(17, 24, 39, 0.92);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 22px;
+      padding: 38px 32px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      text-align: center;
+    }
+
+    .auth-icon-badge {
+      width: 60px;
+      height: 60px;
+      border-radius: 18px;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.8rem;
+      margin-bottom: 18px;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.15);
+    }
+
+    .auth-gate-title {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 8px;
+      letter-spacing: -0.02em;
+    }
+
+    .auth-gate-sub {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.45;
+      margin-bottom: 22px;
+    }
+
+    .auth-input-box {
+      margin-bottom: 16px;
+      text-align: left;
+    }
+
+    .auth-pin-input {
+      width: 100%;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid var(--border);
+      color: #ffffff;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      text-align: center;
+      letter-spacing: 0.2em;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .auth-pin-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .auth-error-text {
+      color: #f87171;
+      font-size: 0.82rem;
+      font-weight: 600;
+      margin-top: 8px;
+      display: none;
+    }
   </style>
 </head>
 <body>
 
-  <div class="container">
+  <!-- Private PIN Security Gate -->
+  <div class="auth-gate-overlay" id="authGate" style="display: flex;">
+    <div class="auth-gate-card">
+      <div class="auth-icon-badge">🔒</div>
+      <h2 class="auth-gate-title">Restricted Access</h2>
+      <p class="auth-gate-sub">This private portal is protected. Please enter your secret Master PIN to unlock the live monitor and hunter.</p>
+      
+      <form onsubmit="handleAuthSubmit(event)">
+        <div class="auth-input-box">
+          <input type="password" id="gatePinInput" class="auth-pin-input" placeholder="••••" maxlength="20" autofocus autocomplete="current-password">
+          <div class="auth-error-text" id="authErrorMsg">⚠️ Incorrect PIN. Access Denied.</div>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 20px;">
+          <input type="checkbox" id="rememberDeviceCheck" checked style="accent-color: #2563eb; cursor: pointer;">
+          <label for="rememberDeviceCheck" style="font-size: 0.82rem; color: var(--text-muted); cursor: pointer;">Remember this device</label>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-size: 0.95rem; justify-content: center;">
+          🔓 Unlock Private Hub
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="container" id="mainAppContainer" style="display: none;">
 
     <!-- Top Navigation Header -->
     <header class="top-nav">
@@ -882,6 +997,11 @@
         <button class="btn" onclick="openSettingsModal()" title="Configuration & Preferences">
           <span>⚙️</span>
           <span>Settings</span>
+        </button>
+
+        <button class="btn" onclick="lockSession()" title="Lock dashboard and sign out">
+          <span>🔒</span>
+          <span>Lock</span>
         </button>
       </div>
     </header>
@@ -1165,6 +1285,11 @@
         <input type="password" id="prefApiKey" class="text-input" placeholder="Leave empty for default">
       </div>
 
+      <div class="input-row">
+        <label class="input-label" for="prefPin">Master Unlock PIN</label>
+        <input type="password" id="prefPin" class="text-input" placeholder="Change unlock PIN (Default: 7171)">
+      </div>
+
       <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
         <button class="btn" onclick="closeSettingsModal()">Cancel</button>
         <button class="btn btn-primary" onclick="saveSettings()">Save Preferences</button>
@@ -1173,6 +1298,91 @@
   </div>
 
   <script>
+    // =========================================================
+    // AUTHENTICATION & ACCESS CONTROL GATE (Private To You)
+    // =========================================================
+    const DEFAULT_PIN_HASH = "f757709ea42f2f0823bb63b83613f116c77b4215b565786ec8b19c2a662e6c93"; // "7171"
+    let isAuthenticated = false;
+
+    async function sha256Hex(text) {
+      const msgBuffer = new TextEncoder().encode(text);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    function getTargetPinHash() {
+      const customHash = localStorage.getItem("mc_hub_pin_hash");
+      return customHash || DEFAULT_PIN_HASH;
+    }
+
+    async function checkAutoAuth() {
+      const remembered = localStorage.getItem("mc_hub_auth_token") || sessionStorage.getItem("mc_hub_auth_token");
+      if (remembered) {
+        const expected = getTargetPinHash();
+        if (remembered === expected) {
+          grantAccess();
+          return true;
+        }
+      }
+      return false;
+    }
+
+    async function handleAuthSubmit(e) {
+      if (e) e.preventDefault();
+      const input = document.getElementById("gatePinInput").value.trim();
+      const errorMsg = document.getElementById("authErrorMsg");
+      if (!input) return;
+
+      const hash = await sha256Hex(input);
+      const targetHash = getTargetPinHash();
+
+      if (hash === targetHash) {
+        errorMsg.style.display = "none";
+        const remember = document.getElementById("rememberDeviceCheck").checked;
+        if (remember) {
+          localStorage.setItem("mc_hub_auth_token", hash);
+        } else {
+          sessionStorage.setItem("mc_hub_auth_token", hash);
+        }
+        grantAccess();
+      } else {
+        errorMsg.style.display = "block";
+        document.getElementById("gatePinInput").select();
+      }
+    }
+
+    function grantAccess() {
+      isAuthenticated = true;
+      document.getElementById("authGate").style.display = "none";
+      document.getElementById("mainAppContainer").style.display = "block";
+
+      const hash = window.location.hash.replace("#", "");
+      if (hash === "hunter" || hash === "monitor" || hash === "queue") {
+        switchTab(hash);
+      }
+
+      fetchMonitorData();
+      startAutoRefresh();
+    }
+
+    function lockSession() {
+      isAuthenticated = false;
+      localStorage.removeItem("mc_hub_auth_token");
+      sessionStorage.removeItem("mc_hub_auth_token");
+      if (refreshTimer) clearInterval(refreshTimer);
+      if (progressTimer) clearInterval(progressTimer);
+      if (isHunting) stopHunting();
+
+      document.getElementById("mainAppContainer").style.display = "none";
+      document.getElementById("authGate").style.display = "flex";
+      document.getElementById("gatePinInput").value = "";
+      document.getElementById("authErrorMsg").style.display = "none";
+      setTimeout(() => {
+        document.getElementById("gatePinInput").focus();
+      }, 100);
+    }
+
     // =========================================================
     // SECURE CONFIGURATION (Protected against raw scraper regexes)
     // =========================================================
@@ -1329,7 +1539,7 @@ ORDER BY mins_ago ASC, completed_today DESC;
     let isFetchingMonitor = false;
 
     async function fetchMonitorData() {
-      if (isFetchingMonitor) return;
+      if (!isAuthenticated || isFetchingMonitor) return;
       isFetchingMonitor = true;
 
       const refreshIcon = document.getElementById("refreshIcon");
@@ -1825,6 +2035,7 @@ ORDER BY mins_ago ASC, completed_today DESC;
       const username = document.getElementById("prefUsername").value.trim() || "Vendor_003_71";
       const endpoint = document.getElementById("prefApiEndpoint").value.trim() || _D_EP;
       const apiKey = document.getElementById("prefApiKey").value.trim() || _D_AK;
+      const newPin = document.getElementById("prefPin").value.trim();
 
       const cfg = {
         username: username,
@@ -1834,19 +2045,39 @@ ORDER BY mins_ago ASC, completed_today DESC;
 
       localStorage.setItem("mc_hub_cfg", JSON.stringify(cfg));
       document.getElementById("hunterUsername").value = username;
+
+      if (newPin) {
+        sha256Hex(newPin).then(newHash => {
+          localStorage.setItem("mc_hub_pin_hash", newHash);
+          localStorage.setItem("mc_hub_auth_token", newHash);
+          alert("Settings and new Master PIN saved successfully!");
+        });
+      } else {
+        alert("Settings saved!");
+      }
+
       document.getElementById("settingsModal").style.display = "none";
-      alert("Settings saved!");
-      fetchMonitorData();
+      if (isAuthenticated) {
+        fetchMonitorData();
+      }
     }
 
     // =========================================================
     // INITIALIZATION ON PAGE LOAD
     // =========================================================
-    window.addEventListener("DOMContentLoaded", () => {
+    window.addEventListener("DOMContentLoaded", async () => {
       const cfg = getConfig();
       document.getElementById("hunterUsername").value = cfg.username;
-      fetchMonitorData();
-      startAutoRefresh();
+
+      // Check if session or device was already authenticated
+      const autoAuth = await checkAutoAuth();
+      if (!autoAuth) {
+        document.getElementById("authGate").style.display = "flex";
+        document.getElementById("mainAppContainer").style.display = "none";
+        setTimeout(() => {
+          document.getElementById("gatePinInput").focus();
+        }, 150);
+      }
     });
   </script>
 </body>
